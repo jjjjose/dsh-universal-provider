@@ -49,6 +49,7 @@ function loadClient(remoteModule: unknown = { default: {} }) {
 
 function context(client: any, mount = vi.fn().mockResolvedValue(undefined)) {
   const entries: { options: any; component: any }[] = []
+  const cleanups: (() => unknown)[] = []
   const api = {
     getState: vi.fn().mockResolvedValue({ status: 'ready' }),
     listAccounts: vi.fn().mockResolvedValue([{ name: 'saved-account', email: 'saved@example.com' }]),
@@ -64,16 +65,37 @@ function context(client: any, mount = vi.fn().mockResolvedValue(undefined)) {
     },
   }
   // Model Cordis' service-access guard, which caused the reported regression.
-  const ctx = new Proxy(services, {
-    get(target, key: keyof typeof services) {
-      if (!client.inject.includes(key)) throw new Error(`cannot get property ${key} without inject`)
+  const createContext = (allowed: string[]): any => new Proxy(services, {
+    get(target, key: keyof typeof services | 'inject' | 'effect') {
+      if (key === 'inject') return (names: string[], callback: (ctx: any) => unknown) => callback(createContext([...allowed, ...names]))
+      if (key === 'effect') return (callback: () => () => unknown) => cleanups.push(callback())
+      if (!allowed.includes(key)) throw new Error(`cannot get property ${key} without inject`)
+      if (key === 'remote') return new Proxy(target.remote, {
+        get(remote, property: keyof typeof target.remote) {
+          if (property === 'universalProvider' && !allowed.includes('remote.universalProvider')) {
+            throw new Error('cannot get property "remote.universalProvider" without inject')
+          }
+          return remote[property]
+        },
+      })
       return target[key]
     },
   })
-  return { ctx, entries, api }
+  const ctx = createContext(client.inject)
+  return { ctx, entries, api, dispose: async () => { for (const cleanup of cleanups) await cleanup() } }
 }
 
 describe('DSH client configuration entry', () => {
+  it('releases the mounted remote contribution on disposal', async () => {
+    const { client } = loadClient()
+    const unmount = vi.fn().mockResolvedValue(undefined)
+    const { ctx, dispose } = context(client, vi.fn().mockResolvedValue(unmount))
+    await client.apply(ctx)
+    expect(unmount).not.toHaveBeenCalled()
+    await dispose()
+    expect(unmount).toHaveBeenCalledOnce()
+  })
+
   it('waits for remote mounting and registers the same component for bundle and row', async () => {
     const { client } = loadClient()
     let finish!: () => void

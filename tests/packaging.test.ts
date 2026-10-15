@@ -85,7 +85,8 @@ describe('Git installation package', () => {
       // Cordis must wait for the remote service, rather than silently skipping it.
       await new Promise(resolve => setTimeout(resolve, 0))
       expect(registrations).toHaveLength(0)
-      ctx.provide('remote', { $mount: mount, universalProvider: {} })
+      ctx.provide('remote', { $mount: mount })
+      ctx.reflect.provide('remote.universalProvider', {})
       await vi.waitFor(() => expect(mount).toHaveBeenCalledTimes(1))
       expect(registrations).toHaveLength(0)
 
