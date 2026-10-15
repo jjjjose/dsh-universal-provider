@@ -1,4 +1,5 @@
 import { waitForOAuth } from './oauth-flow.ts'
+import { expectRemote } from './remote-result.ts'
 import type { PluginConfigViewProps } from '@deepseek-ai/dsh-client-ui-plugin-manager/client'
 import type { SlotRegistry } from '@deepseek-ai/dsh-client-ui-renderer/client'
 
@@ -67,7 +68,7 @@ function registerSettings(ctx: ClientContext, mountError: string | null = null) 
           if (!remote) return
           setLoading(true)
           try {
-            const st = await remote.getState()
+            const st = await expectRemote<any>(remote.getState())
             setStatus(st)
           } catch (e: any) {
             setError(e?.message || 'Error fetching status')
@@ -80,7 +81,7 @@ function registerSettings(ctx: ClientContext, mountError: string | null = null) 
           if (!remote) return
           setLoading(true)
           try {
-            const list = await remote.listAccounts()
+            const list = await expectRemote<any[]>(remote.listAccounts())
             setAccounts(list || [])
           } catch (e: any) {
             setError(e?.message || 'Error fetching accounts')
@@ -93,7 +94,7 @@ function registerSettings(ctx: ClientContext, mountError: string | null = null) 
           if (!remote) return
           setLoading(true)
           try {
-            const list = await remote.listEndpoints()
+            const list = await expectRemote<any[]>(remote.listEndpoints())
             setEndpoints(list || [])
           } catch (e: any) {
             setError(e?.message || 'Error fetching endpoints')
@@ -106,7 +107,7 @@ function registerSettings(ctx: ClientContext, mountError: string | null = null) 
           if (!remote) return
           setLoading(true)
           try {
-            const q = await remote.getQuotas()
+            const q = await expectRemote<any[]>(remote.getQuotas())
             setQuotas(q || [])
           } catch (e: any) {
             setError(e?.message || 'Error fetching quotas')
@@ -119,7 +120,7 @@ function registerSettings(ctx: ClientContext, mountError: string | null = null) 
           if (!remote) return
           setLoading(true)
           try {
-            const l = await remote.getRecentLogs()
+            const l = await expectRemote<string[]>(remote.getRecentLogs())
             setLogs(l || [])
           } catch (e: any) {
             setError(e?.message || 'Error fetching logs')
@@ -146,7 +147,7 @@ function registerSettings(ctx: ClientContext, mountError: string | null = null) 
             return
           }
           try {
-            const list = await llmRemote.listModels('universal-chat-provider')
+            const list = await expectRemote<any[]>(llmRemote.listModels('universal-chat-provider'))
             setAvailableModels(list || [])
           } catch (e: any) {
             setError(e?.message || 'La cuenta se conectó, pero no se pudieron actualizar los modelos.')
@@ -164,9 +165,9 @@ function registerSettings(ctx: ClientContext, mountError: string | null = null) 
           // Open synchronously during the user gesture so the browser does not block the OAuth redirect.
           const popup = window.open('', '_blank')
           try {
-            const res = await remote.startOAuth(provider, controller.signal)
+            const res = await expectRemote<{ state: string; url: string }>(remote.startOAuth(provider, controller.signal))
             if (controller.signal.aborted) {
-              await remote.cancelOAuth(res.state).catch(() => undefined)
+              await expectRemote(remote.cancelOAuth(res.state)).catch(() => undefined)
               if (popup && !popup.closed) popup.close()
               return
             }
@@ -204,7 +205,7 @@ function registerSettings(ctx: ClientContext, mountError: string | null = null) 
           if (!remote) return
           if (!confirm(`¿Eliminar cuenta "${name}"?`)) return
           try {
-            await remote.deleteAccount(name)
+            await expectRemote(remote.deleteAccount(name))
             refreshAccounts()
           } catch (e: any) {
             setError(e?.message || 'Failed to delete account')
@@ -214,11 +215,11 @@ function registerSettings(ctx: ClientContext, mountError: string | null = null) 
         const handleAddEndpoint = async () => {
           if (!remote || !newEndpointName || !newEndpointUrl) return
           try {
-            await remote.saveEndpoint({
+            await expectRemote(remote.saveEndpoint({
               name: newEndpointName,
               baseUrl: newEndpointUrl,
               apiKey: newEndpointKey || undefined,
-            })
+            }))
             setNewEndpointName('')
             setNewEndpointUrl('')
             setNewEndpointKey('')

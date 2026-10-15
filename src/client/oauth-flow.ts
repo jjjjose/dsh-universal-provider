@@ -1,5 +1,9 @@
+import { expectRemote } from './remote-result.ts'
+
 export interface OAuthFlowRemote {
-  pollOAuth(state: string, signal?: AbortSignal): Promise<{ status: 'wait' | 'ok' | 'error'; error?: string }>
+  // Remote methods may resolve either the Typert result envelope or a raw
+  // value; `waitForOAuth` unwraps each response with `expectRemote`.
+  pollOAuth(state: string, signal?: AbortSignal): Promise<unknown>
   cancelOAuth(state: string): Promise<unknown>
 }
 
@@ -32,7 +36,7 @@ export async function waitForOAuth(
     if (options.signal?.aborted) break
 
     try {
-      const result = await remote.pollOAuth(state, options.signal)
+      const result = await expectRemote<{ status: 'wait' | 'ok' | 'error'; error?: string }>(remote.pollOAuth(state, options.signal))
       if (result.status === 'ok') return { status: 'ok' }
       if (result.status === 'error') return { status: 'error', error: result.error || 'OAuth sign-in failed.' }
     } catch (error: any) {
@@ -41,7 +45,7 @@ export async function waitForOAuth(
     }
   }
 
-  await remote.cancelOAuth(state).catch(() => undefined)
+  await expectRemote(remote.cancelOAuth(state)).catch(() => undefined)
   return options.signal?.aborted
     ? { status: 'cancelled' }
     : { status: 'timeout', ...(lastError ? { error: lastError } : {}) }

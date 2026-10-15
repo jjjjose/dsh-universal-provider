@@ -8,6 +8,12 @@ El formato se basa en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/
 
 ## [Unreleased]
 
+## [0.30.3] - 2026-10-15
+
+### Corregido
+- **Panel de gestión:** El cliente desenvuelve el sobre `RemoteResult` (`{ ok, value }`) de las llamadas remotas; antes guardaba el sobre como si fuera el valor, el panel rompía con `accounts.map is not a function` y se quedaba sin cuentas ni botones de vinculación.
+- **Vinculación OAuth:** El sondeo `pollOAuth` y la cancelación `cancelOAuth` también desenvuelven el resultado, así que el flujo de vinculación completa y refresca cuentas, modelos y estado.
+
 ## [0.30.2] - 2026-10-15
 
 ### Corregido

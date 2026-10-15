@@ -3,7 +3,7 @@ import { waitForOAuth } from '../src/client/oauth-flow.ts'
 
 describe('client OAuth flow polling', () => {
   it('returns success when the provider confirms login', async () => {
-    const remote = { pollOAuth: vi.fn().mockResolvedValue({ status: 'ok' }), cancelOAuth: vi.fn() }
+    const remote = { pollOAuth: vi.fn().mockResolvedValue({ ok: true, value: { status: 'ok' } }), cancelOAuth: vi.fn() }
     let now = 0
     const result = await waitForOAuth(remote, 'state-1', {
       now: () => now,
@@ -20,8 +20,10 @@ describe('client OAuth flow polling', () => {
   it('returns provider errors and retries transient poll failures', async () => {
     const remote = {
       pollOAuth: vi.fn()
+        // Transport failure, then a failure envelope, both transient.
         .mockRejectedValueOnce(new Error('temporary network error'))
-        .mockResolvedValueOnce({ status: 'error', error: 'Access denied' }),
+        .mockResolvedValueOnce({ ok: false, error: new Error('temporary network error') })
+        .mockResolvedValueOnce({ ok: true, value: { status: 'error', error: 'Access denied' } }),
       cancelOAuth: vi.fn(),
     }
     let now = 0
@@ -33,13 +35,13 @@ describe('client OAuth flow polling', () => {
     })
 
     expect(result).toEqual({ status: 'error', error: 'Access denied' })
-    expect(remote.pollOAuth).toHaveBeenCalledTimes(2)
+    expect(remote.pollOAuth).toHaveBeenCalledTimes(3)
     expect(remote.cancelOAuth).not.toHaveBeenCalled()
   })
 
   it('cancels an OAuth session on timeout or user cancellation', async () => {
     let now = 0
-    const timedOutRemote = { pollOAuth: vi.fn().mockResolvedValue({ status: 'wait' }), cancelOAuth: vi.fn().mockResolvedValue(true) }
+    const timedOutRemote = { pollOAuth: vi.fn().mockResolvedValue({ ok: true, value: { status: 'wait' } }), cancelOAuth: vi.fn().mockResolvedValue({ ok: true, value: true }) }
     const timeout = await waitForOAuth(timedOutRemote, 'state-timeout', {
       now: () => now,
       delay: async ms => { now += ms },
@@ -50,7 +52,7 @@ describe('client OAuth flow polling', () => {
     expect(timedOutRemote.cancelOAuth).toHaveBeenCalledWith('state-timeout')
 
     const controller = new AbortController()
-    const cancelledRemote = { pollOAuth: vi.fn(), cancelOAuth: vi.fn().mockResolvedValue(true) }
+    const cancelledRemote = { pollOAuth: vi.fn(), cancelOAuth: vi.fn().mockResolvedValue({ ok: true, value: true }) }
     const cancelled = await waitForOAuth(cancelledRemote, 'state-cancelled', {
       signal: controller.signal,
       delay: async () => { controller.abort() },

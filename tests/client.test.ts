@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs'
 import vm from 'node:vm'
 import ts from 'typescript'
 import { describe, expect, it, vi } from 'vitest'
+import { expectRemote } from '../src/client/remote-result.ts'
 
 // Exercise the client entry as DSH loads it, with its runtime require boundary.
 // The small hook driver runs page effects without adding a DOM dependency.
@@ -32,6 +33,7 @@ function loadClient(remoteModule: unknown = { default: {} }, browser: any = {}, 
       if (id === 'react') return react
       if (id === 'universal-provider/remote') return remoteModule
       if (id === './oauth-flow.ts') return { waitForOAuth }
+      if (id === './remote-result.ts') return { expectRemote }
       throw new Error(`Unexpected client dependency: ${id}`)
     },
     window: browser,
@@ -62,13 +64,15 @@ function context(client: any, mount = vi.fn().mockResolvedValue(undefined)) {
   // raw fiber (which itself has no `then`, so promise assimilation terminates).
   const fiber: any = { state: 2, ctx: {} }
   const fiberLike: any = { then: (resolve: (value: unknown) => void) => resolve(fiber) }
+  // DSH's Typert gateway always resolves remote invocations wrapped in a
+  // RemoteResult envelope, so the mock models that contract.
   const api = {
-    getState: vi.fn().mockResolvedValue({ status: 'ready' }),
-    listAccounts: vi.fn().mockResolvedValue([{ name: 'saved-account', email: 'saved@example.com' }]),
-    startOAuth: vi.fn().mockResolvedValue({ url: 'https://example.com/oauth', state: 'oauth-state' }),
-    cancelOAuth: vi.fn().mockResolvedValue(true),
+    getState: vi.fn().mockResolvedValue({ ok: true, value: { status: 'ready' } }),
+    listAccounts: vi.fn().mockResolvedValue({ ok: true, value: [{ name: 'saved-account', email: 'saved@example.com' }] }),
+    startOAuth: vi.fn().mockResolvedValue({ ok: true, value: { url: 'https://example.com/oauth', state: 'oauth-state' } }),
+    cancelOAuth: vi.fn().mockResolvedValue({ ok: true, value: true }),
   }
-  const llm = { listModels: vi.fn().mockResolvedValue([{ id: 'test-model' }]) }
+  const llm = { listModels: vi.fn().mockResolvedValue({ ok: true, value: [{ id: 'test-model' }] }) }
   const services = {
     remote: { $mount: mount, universalProvider: api, llm },
     slots: {
@@ -196,6 +200,16 @@ describe('DSH client configuration entry', () => {
     await new Promise(resolve => setImmediate(resolve))
     expect(render(entries[0].component)).toContain('accounts unavailable')
     expect(api.getState).toHaveBeenCalledOnce()
+  })
+
+  it('reports remote failure envelopes without crashing the page', async () => {
+    const { client, render } = loadClient()
+    const { ctx, entries, api } = context(client)
+    api.listAccounts.mockResolvedValue({ ok: false, error: new Error('accounts unavailable') })
+    await client.apply(ctx)
+    render(entries[0].component)
+    await new Promise(resolve => setImmediate(resolve))
+    expect(render(entries[0].component)).toContain('accounts unavailable')
   })
 
   it('resolves application without returning the injected fiber', async () => {
