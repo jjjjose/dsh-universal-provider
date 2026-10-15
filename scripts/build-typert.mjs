@@ -125,7 +125,7 @@ const invocationsCode = `[
         typeSymbol: 'universal-provider/types#PingResult',
         create: getPingResultSchema,
       },
-      sourceLocation: { file: 'packages/universal-provider/src/index.ts', line: 15, column: 3 },
+      sourceLocation: { file: 'src/index.ts', line: 15, column: 3 },
     },
     {
       id: 'universal-provider#universalProvider/getState',
@@ -140,7 +140,7 @@ const invocationsCode = `[
         typeSymbol: 'universal-provider/types#ProviderStatus',
         create: getStatusResultSchema,
       },
-      sourceLocation: { file: 'packages/universal-provider/src/index.ts', line: 25, column: 3 },
+      sourceLocation: { file: 'src/index.ts', line: 25, column: 3 },
     },
     {
       id: 'universal-provider#universalProvider/listAccounts',
@@ -155,7 +155,7 @@ const invocationsCode = `[
         typeSymbol: 'universal-provider/types#AccountsList',
         create: getAccountsListSchema,
       },
-      sourceLocation: { file: 'packages/universal-provider/src/index.ts', line: 35, column: 3 },
+      sourceLocation: { file: 'src/index.ts', line: 35, column: 3 },
     },
     {
       id: 'universal-provider#universalProvider/startOAuth',
@@ -181,7 +181,7 @@ const invocationsCode = `[
         typeSymbol: 'universal-provider/types#OAuthStartResult',
         create: getOAuthStartResultSchema,
       },
-      sourceLocation: { file: 'packages/universal-provider/src/index.ts', line: 45, column: 3 },
+      sourceLocation: { file: 'src/index.ts', line: 45, column: 3 },
     },
     {
       id: 'universal-provider#universalProvider/pollOAuth',
@@ -207,7 +207,7 @@ const invocationsCode = `[
         typeSymbol: 'universal-provider/types#OAuthPollResult',
         create: getOAuthPollResultSchema,
       },
-      sourceLocation: { file: 'packages/universal-provider/src/index.ts', line: 55, column: 3 },
+      sourceLocation: { file: 'src/index.ts', line: 55, column: 3 },
     },
     {
       id: 'universal-provider#universalProvider/cancelOAuth',
@@ -233,7 +233,7 @@ const invocationsCode = `[
         typeSymbol: 'universal-provider/types#boolean',
         create: getBooleanSchema,
       },
-      sourceLocation: { file: 'packages/universal-provider/src/index.ts', line: 65, column: 3 },
+      sourceLocation: { file: 'src/index.ts', line: 65, column: 3 },
     },
     {
       id: 'universal-provider#universalProvider/deleteAccount',
@@ -259,7 +259,7 @@ const invocationsCode = `[
         typeSymbol: 'universal-provider/types#boolean',
         create: getBooleanSchema,
       },
-      sourceLocation: { file: 'packages/universal-provider/src/index.ts', line: 75, column: 3 },
+      sourceLocation: { file: 'src/index.ts', line: 75, column: 3 },
     },
     {
       id: 'universal-provider#universalProvider/listEndpoints',
@@ -274,7 +274,7 @@ const invocationsCode = `[
         typeSymbol: 'universal-provider/types#EndpointsList',
         create: getEndpointsListSchema,
       },
-      sourceLocation: { file: 'packages/universal-provider/src/index.ts', line: 85, column: 3 },
+      sourceLocation: { file: 'src/index.ts', line: 85, column: 3 },
     },
     {
       id: 'universal-provider#universalProvider/saveEndpoint',
@@ -300,7 +300,7 @@ const invocationsCode = `[
         typeSymbol: 'universal-provider/types#boolean',
         create: getBooleanSchema,
       },
-      sourceLocation: { file: 'packages/universal-provider/src/index.ts', line: 95, column: 3 },
+      sourceLocation: { file: 'src/index.ts', line: 95, column: 3 },
     },
     {
       id: 'universal-provider#universalProvider/getQuotas',
@@ -315,7 +315,7 @@ const invocationsCode = `[
         typeSymbol: 'universal-provider/types#QuotasList',
         create: getQuotasListSchema,
       },
-      sourceLocation: { file: 'packages/universal-provider/src/index.ts', line: 105, column: 3 },
+      sourceLocation: { file: 'src/index.ts', line: 105, column: 3 },
     },
     {
       id: 'universal-provider#universalProvider/getRecentLogs',
@@ -330,7 +330,7 @@ const invocationsCode = `[
         typeSymbol: 'universal-provider/types#LogsList',
         create: getLogsListSchema,
       },
-      sourceLocation: { file: 'packages/universal-provider/src/index.ts', line: 115, column: 3 },
+      sourceLocation: { file: 'src/index.ts', line: 115, column: 3 },
     },
     {
       id: 'universal-provider#universalProvider/generateCommitDraft',
@@ -356,7 +356,7 @@ const invocationsCode = `[
         typeSymbol: 'universal-provider/types#CommitDraftResult',
         create: getCommitDraftResultSchema,
       },
-      sourceLocation: { file: 'packages/universal-provider/src/index.ts', line: 125, column: 3 },
+      sourceLocation: { file: 'src/index.ts', line: 125, column: 3 },
     },
     {
       id: 'universal-provider#universalProvider/configureTitles',
@@ -382,7 +382,7 @@ const invocationsCode = `[
         typeSymbol: 'universal-provider/types#boolean',
         create: getBooleanSchema,
       },
-      sourceLocation: { file: 'packages/universal-provider/src/index.ts', line: 135, column: 3 },
+      sourceLocation: { file: 'src/index.ts', line: 135, column: 3 },
     },
     {
       id: 'universal-provider#universalProvider/configureCompaction',
@@ -408,7 +408,7 @@ const invocationsCode = `[
         typeSymbol: 'universal-provider/types#boolean',
         create: getBooleanSchema,
       },
-      sourceLocation: { file: 'packages/universal-provider/src/index.ts', line: 145, column: 3 },
+      sourceLocation: { file: 'src/index.ts', line: 145, column: 3 },
     }
   ]`
 

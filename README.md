@@ -28,6 +28,24 @@ El resultado es un paquete distribuible precompilado (`.tgz`) que se integra de 
 - DeepSeek Harness `0.2.1-alpha.2` o posterior.
 - Node.js 22+ y pnpm instalados (o usando las herramientas empaquetadas en `$DSH_HOME/dsh-runtimes/`).
 
+### Instalación desde GitHub
+En el instalador de plugins de DSH, selecciona **Git repository** e introduce:
+
+```text
+https://github.com/jjjjose/dsh-universal-provider
+```
+
+También puedes instalarlo desde la CLI:
+
+```bash
+dsh plugin --profile <tu-perfil> add https://github.com/jjjjose/dsh-universal-provider
+```
+
+La raíz del repositorio es el paquete `universal-provider` y declara `dsh.bundle`.
+El script `prepare` compila los artefactos al instalar desde Git (requiere permitir
+los scripts de compilación). Si tu política bloquea esos scripts, usa el tarball
+precompilado descrito a continuación.
+
 ### Instalación en un perfil
 El plugin se distribuye como un archivo tarball precompilado (`universal-provider-0.30.0.tgz`). Para instalarlo en el perfil deseado (por ejemplo, `default` o un perfil personalizado):
 

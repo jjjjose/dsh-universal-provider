@@ -4,7 +4,5 @@
     "noEmit": true,
     "jsx": "react-jsx"
   },
-  "references": [
-    { "path": "./packages/universal-provider/tsconfig.client.json" }
-  ]
+  "include": ["src/client/**/*.ts", "src/client/**/*.tsx"]
 }
