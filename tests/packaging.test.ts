@@ -35,4 +35,33 @@ describe('Git installation package', () => {
     expect(config).toContain('src/index.ts')
     expect(config).toContain('src/client/index.ts')
   })
+
+  it('client bundle only requires platform seed modules', () => {
+    // The DSH web client module table seeds exactly these specifiers; any other
+    // external `require(...)` aborts the web boot ("missed the module table").
+    const seedWords = new Set([
+      'react',
+      'react/jsx-runtime',
+      'react-dom',
+      'react-dom/client',
+      '@deepseek-ai/cordis',
+      '@deepseek-ai/dsh-client-store',
+      '@deepseek-ai/dsh-client-ui-slots',
+      '@deepseek-ai/dsh-client-ui-primitives',
+      '@deepseek-ai/dsh-client-ui-dockkit',
+    ])
+    const clientArtifact = readFileSync(new URL('lib/client.js', root), 'utf8')
+    const requests = [...clientArtifact.matchAll(/\brequire\("([^"]+)"\)/g)].map((match) => match[1])
+    for (const request of requests) expect(seedWords.has(request)).toBe(true)
+    expect(requests).toContain('react')
+    expect(clientArtifact).not.toMatch(/require\(["']zod["']\)/)
+    expect(clientArtifact).toContain('ZodError')
+  })
+
+  it('keeps the client dependency policy that avoids externals drift', () => {
+    const config = readFileSync(new URL('tsdown.config.ts', root), 'utf8')
+    expect(config).toContain('neverBundle')
+    expect(config).toContain('alwaysBundle')
+    expect(config).toMatch(/alwaysBundle: \['zod'\]/)
+  })
 })

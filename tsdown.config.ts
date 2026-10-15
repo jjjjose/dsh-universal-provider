@@ -44,6 +44,13 @@ export default defineConfig([
     fixedExtension: false,
     dts: false,
     clean: false,
+    // `react` is a platform seed word resolved by the DSH client module table,
+    // so it must stay a runtime require. `zod` is NOT seeded: it must be
+    // inlined or the web boot fails with "require(\"zod\") missed the module table".
+    deps: {
+      neverBundle: ['react', 'react/jsx-runtime', 'react-dom', 'react-dom/client'],
+      alwaysBundle: ['zod'],
+    },
     outputOptions: {
       entryFileNames: 'client.js',
     },
