@@ -2,7 +2,7 @@
 
 Plugin oficial empaquetado para DeepSeek Harness (DSH v0.2.1-alpha.2 y versiones compatibles), que permite conectar cuentas OAuth (Claude, Codex, Antigravity, Kimi, xAI Grok, Devin, Meta Muse) y endpoints compatibles con OpenAI para utilizarlos de forma transparente en el chat nativo de DeepSeek Harness.
 
-El resultado es un paquete distribuible precompilado (`.tgz`) que se integra de manera limpia a través de los contratos nativos de Cordis y DSH (`dsh.bundle`, `ctx.llm.registerAdapter`, `dsh-typert-loader` y `settings.section`), sin modificar el core de la aplicación ni ejecutar servidores de chat paralelos.
+El resultado es un paquete distribuible precompilado (`.tgz`) que se integra de manera limpia a través de los contratos nativos de Cordis y DSH (`dsh.bundle`, `ctx.llm.registerAdapter`, `dsh-typert-loader` y `plugins.bundle.config`), sin modificar el core de la aplicación ni ejecutar servidores de chat paralelos.
 
 ---
 
@@ -16,7 +16,7 @@ El resultado es un paquete distribuible precompilado (`.tgz`) que se integra de 
 | **Cuentas OAuth** | ✅ 7 Proveedores | Botones directos para ChatGPT/Codex y Google Antigravity; los demás proveedores siguen disponibles en «Otros proveedores». Admite varias cuentas por proveedor. |
 | **Endpoints OpenAI Compatibles** | ✅ Soportado | Soporte para Ollama, vLLM, LMStudio, OpenRouter o endpoints corporativos con clave write-only. |
 | **Cuotas de Proveedores** | ✅ 5 Proveedores | Monitoreo de ventanas de uso y cálculo de resets para Codex (5h/7d), Claude, Antigravity (por modelo), Grok y Kimi. |
-| **Panel de Gestión** | ✅ Nativo | Integrado como pestaña en `Settings` (`settings.section`) con slots del cliente web y tokens de tema. |
+| **Panel de Gestión** | ✅ Nativo | Panel propio dentro de **Plugins → Universal Provider** (`plugins.bundle.config`), con slots del cliente web y tokens de tema. |
 | **Supervisor de CLIProxyAPI** | ✅ Supervisado | Modo **Managed** (descarga con hash SHA-256, lock de propietario, loopback `127.0.0.1`, proceso controlado por `ctx.subprocess`) y modo **External** (conexión remota sin tocar binarios). |
 | **Modelos Auxiliares** | ✅ Integrado | Configuración de títulos mediante `configEditor`, compactación nativa en `dsh-compaction-basic` y borrador de commits sobre `git diff --cached`. |
 
@@ -78,7 +78,7 @@ rm -rf "$DSH_HOME/cache/universal-provider"
 
 ## 3. Configuración y Modos de Ejecución
 
-La configuración se gestiona en el panel de **Settings → Universal Provider** o mediante la capa de parches del perfil en `cordis.patch.yml`:
+La configuración y gestión de cuentas se realizan desde **Plugins → Universal Provider**. Los parámetros del servidor también pueden definirse en la capa de parches del perfil `cordis.patch.yml`:
 
 ```yaml
 - insert:
@@ -106,7 +106,7 @@ La configuración se gestiona en el panel de **Settings → Universal Provider**
 
 ## 4. Uso del Panel de Gestión
 
-Al abrir **Settings** en la interfaz web de DeepSeek Harness, se dispondrá de la sección **Universal Provider**:
+En **Plugins**, abre los detalles de **Universal Provider**. El panel de gestión aparece debajo de la descripción del plugin; las cuentas OAuth se muestran al entrar:
 
 1. **Estado:** Muestra si el servidor está listo (`ready`), el modo activo, el puerto y el conteo de peticiones activas.
 2. **Cuentas OAuth:**

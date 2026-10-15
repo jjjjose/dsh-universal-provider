@@ -9,6 +9,11 @@ describe('Git installation package', () => {
     expect(pkg.name).toBe('universal-provider')
     expect(pkg.private).not.toBe(true)
     expect(pkg.dsh.bundle.patch).toBe('./cordis.patch.yml')
+    expect(pkg.dsh.client.immediately).toBe(true)
+    const clientEntry = readFileSync(new URL('src/client/index.ts', root), 'utf8')
+    expect(clientEntry).toContain("export const inject = ['slots']")
+    expect(clientEntry).toContain("ctx.slots.inject('plugins.bundle.config'")
+    expect(clientEntry).toContain("key: 'universal-provider'")
     const patch = readFileSync(new URL(pkg.dsh.bundle.patch, root), 'utf8')
     expect(patch).toContain("name: 'universal-provider'")
   })
@@ -22,6 +27,7 @@ describe('Git installation package', () => {
     const clientArtifact = readFileSync(new URL('lib/client.js', root), 'utf8')
     expect(clientArtifact).toContain('Otros proveedores OAuth')
     expect(clientArtifact).toContain('Google Antigravity')
+    expect(clientArtifact).toContain('plugins.bundle.config')
   })
 
   it('has source entrypoints in the root build configuration', () => {

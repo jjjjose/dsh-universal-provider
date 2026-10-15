@@ -1,5 +1,7 @@
 import { waitForOAuth } from './oauth-flow.ts'
 
+export const inject = ['slots']
+
 export function apply(ctx: any) {
   // Mount Remote descriptors
   if (ctx.remote && typeof ctx.remote.$mount === 'function') {
@@ -11,21 +13,19 @@ export function apply(ctx: any) {
     } catch {}
   }
 
-  // Register in settings.section slot
+  // Register this management page inside Plugins → Universal Provider.
   if (ctx.slots && typeof ctx.slots.inject === 'function') {
-    ctx.slots.inject('settings.section', () => {
-      ctx.slots.register({
-        name: 'settings.section',
-        id: 'universal-provider',
-        order: 25,
-        label: () => 'Universal Provider',
-      }, function UniversalProviderSettingsView(props: any) {
+    const dispose = ctx.slots.inject('plugins.bundle.config', () => ctx.slots.register({
+      name: 'plugins.bundle.config',
+      key: 'universal-provider',
+      label: () => 'Universal Provider',
+    }, function UniversalProviderSettingsView(props: any) {
         const React = typeof require !== 'undefined' ? require('react') : (window as any).React
         const h = React.createElement
         const useState = React.useState as <T>(initial: T | (() => T)) => [T, (value: T | ((previous: T) => T)) => void]
         const useEffect = React.useEffect
 
-        const [tab, setTab] = useState('status')
+        const [tab, setTab] = useState('accounts')
         const [status, setStatus] = useState<any>(null)
         const [accounts, setAccounts] = useState<any[]>([])
         const [endpoints, setEndpoints] = useState<any[]>([])
@@ -116,12 +116,12 @@ export function apply(ctx: any) {
 
         useEffect(() => {
           oauthFlow.mounted = true
-          refreshStatus()
+          if (props.view === 'page') refreshStatus()
           return () => {
             oauthFlow.mounted = false
             oauthFlow.controller?.abort()
           }
-        }, [])
+        }, [props.view])
 
         const refreshModelList = async () => {
           const llmRemote = ctx.remote?.llm
@@ -236,6 +236,10 @@ export function apply(ctx: any) {
             fontSize: '13px',
           },
         }, label)
+
+        if (props.view === 'summary') {
+          return h('span', null, 'Conecta y administra tus cuentas de Antigravity, ChatGPT/Codex y otros proveedores.')
+        }
 
         return h('div', {
           style: {
@@ -547,7 +551,9 @@ export function apply(ctx: any) {
             }, logs.length > 0 ? logs.join('\n') : 'Sin registros disponibles.'),
           ]) : null,
         ])
-      })
-    })
+    }))
+    if (typeof ctx.effect === 'function') {
+      ctx.effect(() => () => dispose(), 'universal-provider: plugin config page')
+    }
   }
 }
