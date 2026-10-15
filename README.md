@@ -42,9 +42,10 @@ dsh plugin --profile <tu-perfil> add https://github.com/jjjjose/dsh-universal-pr
 ```
 
 La raíz del repositorio es el paquete `universal-provider` y declara `dsh.bundle`.
-El script `prepare` compila los artefactos al instalar desde Git (requiere permitir
-los scripts de compilación). Si tu política bloquea esos scripts, usa el tarball
-precompilado descrito a continuación.
+Los artefactos precompilados de `lib/` están incluidos en el repositorio, por lo que
+la instalación Git no necesita ejecutar scripts de compilación ni autorizar builds.
+Para crear una distribución local, los mantenedores ejecutan `pnpm run build` antes
+de empaquetar.
 
 ### Instalación en un perfil
 El plugin se distribuye como un archivo tarball precompilado (`universal-provider-0.30.0.tgz`). Para instalarlo en el perfil deseado (por ejemplo, `default` o un perfil personalizado):

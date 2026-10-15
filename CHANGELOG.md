@@ -9,6 +9,7 @@ El formato se basa en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/
 ## [Unreleased]
 
 ### Mejorado
+- **Instalación desde Git sin scripts:** Se eliminan `prepare` y `prepack`; las instalaciones consumen `lib/` precompilado y no requieren incluir el paquete en la allowlist `allowBuilds` de pnpm.
 - **Vinculación de cuentas en DSH:** Botones directos para Antigravity y ChatGPT/Codex, espera OAuth cancelable con límite de tiempo, lista de varias cuentas y consulta de modelos después de autenticar.
 - **Descubrimiento nativo de modelos:** Tras completar OAuth, la interfaz consulta los modelos del proveedor LLM nativo de DSH para que puedan seleccionarse desde el picker.
 

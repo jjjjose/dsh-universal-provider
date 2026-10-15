@@ -13,12 +13,15 @@ describe('Git installation package', () => {
     expect(patch).toContain("name: 'universal-provider'")
   })
 
-  it('builds Git dependencies and tarballs without workspace recursion', () => {
-    expect(pkg.scripts.prepare).toBe('pnpm run build')
-    expect(pkg.scripts.prepack).toBe('pnpm run build')
+  it('installs from Git without requiring build-script approval', () => {
+    expect(pkg.scripts.prepare).toBeUndefined()
+    expect(pkg.scripts.prepack).toBeUndefined()
     expect(pkg.scripts.build).toContain('tsdown')
     expect(pkg.scripts.build).not.toContain('pnpm -r')
     expect(pkg.files).toContain('lib/')
+    const clientArtifact = readFileSync(new URL('lib/client.js', root), 'utf8')
+    expect(clientArtifact).toContain('Otros proveedores OAuth')
+    expect(clientArtifact).toContain('Google Antigravity')
   })
 
   it('has source entrypoints in the root build configuration', () => {
