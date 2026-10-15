@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Universal Provider",
+    "description": "Expose multi-provider OAuth accounts and OpenAI-compatible endpoints to DeepSeek Harness chat with native streaming, tools, reasoning, and quotas."
+  }
+}

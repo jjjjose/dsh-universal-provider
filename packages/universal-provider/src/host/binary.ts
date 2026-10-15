@@ -1,0 +1,181 @@
+import { createHash } from 'node:crypto'
+import { access, chmod, mkdir, readdir, rm, writeFile } from 'node:fs/promises'
+import { arch as osArch, platform as osPlatform } from 'node:os'
+import { dirname, join } from 'node:path'
+import { kyFetch } from '../core/shared/kyFetch.ts'
+import { unzipSync } from 'fflate'
+import { parseTarGzip } from 'nanotar'
+import semver from 'semver'
+
+const REPO = 'router-for-me/CLIProxyAPI'
+export const MIN_CLIPROXY_VERSION = '8.0.3'
+
+interface AssetInfo {
+  assetName: string
+  binaryName: string
+  isZip: boolean
+}
+
+export function resolveAsset(platform: NodeJS.Platform, arch: string, version: string): AssetInfo {
+  const os = platform === 'darwin' ? 'darwin' : platform === 'win32' ? 'windows' : 'linux'
+  const cpu = arch === 'arm64' ? 'aarch64' : 'amd64'
+  const isZip = os === 'windows'
+  return {
+    assetName: `CLIProxyAPI_${version}_${os}_${cpu}.${isZip ? 'zip' : 'tar.gz'}`,
+    binaryName: os === 'windows' ? 'cli-proxy-api.exe' : 'cli-proxy-api',
+    isZip,
+  }
+}
+
+export function parseChecksums(text: string): Map<string, string> {
+  const result = new Map<string, string>()
+  for (const line of text.split('\n')) {
+    const match = /^([0-9a-f]{64})\s+\*?(\S.*)$/i.exec(line.trim())
+    if (match && match[2] && match[1])
+      result.set(match[2].trim(), match[1].toLowerCase())
+  }
+  return result
+}
+
+export function normalizeVersion(version: string): string {
+  return version.trim().replace(/^v/i, '')
+}
+
+export function isSupportedVersion(version: string): boolean {
+  const normalized = normalizeVersion(version)
+  const valid = semver.valid(normalized)
+  return valid !== null && semver.satisfies(valid, `>=${MIN_CLIPROXY_VERSION}`)
+}
+
+const fetcher = kyFetch.extend({
+  headers: { 'User-Agent': 'universal-chat-provider-dsh' },
+  retry: { limit: 3 },
+  timeout: false,
+})
+
+export async function resolveVersion(requested: string, signal?: AbortSignal): Promise<string> {
+  if (requested.toLowerCase() !== 'latest')
+    return normalizeVersion(requested)
+  const payload = await fetcher
+    .get(`https://api.github.com/repos/${REPO}/releases/latest`, { signal: signal ?? null })
+    .json<{ tag_name?: string }>()
+  if (typeof payload.tag_name !== 'string' || payload.tag_name.length === 0)
+    throw new Error('Could not determine the latest CLIProxyAPI release.')
+  return normalizeVersion(payload.tag_name)
+}
+
+export interface AcquireOptions {
+  binDir: string
+  requestedVersion: string
+  log?: (message: string) => void
+  signal?: AbortSignal
+}
+
+export interface AcquireResult {
+  binaryPath: string
+  version: string
+}
+
+export async function acquireBinary(options: AcquireOptions): Promise<AcquireResult> {
+  let version: string
+  try {
+    version = await resolveVersion(options.requestedVersion, options.signal)
+  }
+  catch (error) {
+    const cachedVersion = await readInstalledVersion(options.binDir)
+    if (cachedVersion === undefined)
+      throw error
+    options.log?.(`Could not resolve latest CLIProxyAPI release (${error instanceof Error ? error.message : String(error)}). Using cached CLIProxyAPI ${cachedVersion}.`)
+    version = cachedVersion
+  }
+
+  if (!isSupportedVersion(version))
+    throw new Error(`CLIProxyAPI ${version} is not supported. Minimum required version is ${MIN_CLIPROXY_VERSION}.`)
+
+  const asset = resolveAsset(osPlatform(), osArch(), version)
+  const versionDir = join(options.binDir, version)
+  const binaryPath = join(versionDir, asset.binaryName)
+
+  if (await access(binaryPath).then(() => true, () => false)) {
+    options.log?.(`Using cached CLIProxyAPI ${version} at ${binaryPath}.`)
+    return { binaryPath, version }
+  }
+
+  options.log?.(`Downloading CLIProxyAPI ${version} (${asset.assetName})...`)
+  const base = `https://github.com/${REPO}/releases/download/v${version}`
+  const signal = options.signal ?? null
+  const [archiveResponse, checksumResponse] = await Promise.all([
+    fetcher.get(`${base}/${asset.assetName}`, { signal }),
+    fetcher.get(`${base}/checksums.txt`, { signal }),
+  ])
+  const archive = new Uint8Array(await archiveResponse.arrayBuffer())
+  const expected = parseChecksums(await checksumResponse.text()).get(asset.assetName)
+  if (expected === undefined)
+    throw new Error(`No checksum found for ${asset.assetName}.`)
+  const actual = createHash('sha256').update(archive).digest('hex')
+  if (actual !== expected)
+    throw new Error(`Checksum mismatch for ${asset.assetName} (expected ${expected}, got ${actual}).`)
+
+  await rm(versionDir, { recursive: true, force: true })
+  await mkdir(versionDir, { recursive: true })
+  await extractArchive(archive, asset.isZip, versionDir)
+
+  if (!(await access(binaryPath).then(() => true, () => false)))
+    throw new Error(`Extracted archive did not contain ${asset.binaryName}.`)
+  if (osPlatform() !== 'win32')
+    await chmod(binaryPath, 0o755)
+
+  options.log?.(`Installed CLIProxyAPI ${version} at ${binaryPath}.`)
+  await pruneOldVersions(options.binDir, version, options.log)
+  return { binaryPath, version }
+}
+
+export async function extractArchive(archive: Uint8Array, isZip: boolean, dest: string): Promise<void> {
+  const entries = isZip
+    ? Object.entries(unzipSync(archive)).map(([name, data]) => ({ name, data }))
+    : (await parseTarGzip(archive)).map(item => ({ name: item.name, data: item.data }))
+
+  for (const { name, data } of entries) {
+    if (data === undefined || name.endsWith('/'))
+      continue
+    // Security check: Directory traversal prevention
+    const parts = name.replace(/\\/g, '/').split('/')
+    if (parts.includes('..') || parts.some(p => p.startsWith('/')))
+      throw new Error(`Refusing to extract unsafe archive entry: ${name}`)
+    const target = join(dest, ...parts)
+    await mkdir(dirname(target), { recursive: true })
+    await writeFile(target, data)
+  }
+}
+
+export async function readInstalledVersion(binDir: string): Promise<string | undefined> {
+  let entries: string[]
+  try {
+    entries = await readdir(binDir)
+  }
+  catch {
+    return undefined
+  }
+  const valid = entries.filter(entry => semver.valid(entry) !== null)
+  const sorted = semver.rsort(valid)
+  return sorted[0]
+}
+
+async function pruneOldVersions(binDir: string, keep: string, log?: (msg: string) => void): Promise<void> {
+  let entries: string[]
+  try {
+    entries = await readdir(binDir)
+  }
+  catch {
+    return
+  }
+  await Promise.all(entries
+    .filter(entry => entry !== keep)
+    .map(async (entry) => {
+      try {
+        await rm(join(binDir, entry), { recursive: true, force: true })
+        log?.(`Removed old CLIProxyAPI version ${entry}.`)
+      }
+      catch {}
+    }))
+}

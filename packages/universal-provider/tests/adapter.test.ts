@@ -1,0 +1,93 @@
+import { describe, expect, it } from 'vitest'
+import { UniversalLlmAdapter } from '../src/host/adapter.ts'
+
+describe('UniversalLlmAdapter', () => {
+  const mockSupervisor = {
+    ensureRunning: async () => {},
+    acquireRequest: async () => () => {},
+    getProxyClient: () => ({
+      discover: async () => ({
+        available: [{ id: 'claude-3-7-sonnet', context_length: 200000, max_completion_tokens: 8192 }],
+        metadata: [{ slug: 'claude-3-7-sonnet', display_name: 'Claude 3.7 Sonnet', supported_reasoning_levels: [{ effort: 'high' }] }],
+      }),
+      streamResponse: async (_body: any, callbacks: any) => {
+        callbacks.onThinking?.('Let me analyze...')
+        callbacks.onText('Here is the ')
+        callbacks.onText('answer.')
+        callbacks.onToolCall('call-1', 'bash', { command: 'ls' })
+        callbacks.onUsage?.({ prompt_tokens: 15, completion_tokens: 20, total_tokens: 35 })
+      },
+    }),
+  } as any
+
+  it('translates DSH GenerateOptions to /v1/responses format', () => {
+    const adapter = new UniversalLlmAdapter(mockSupervisor)
+    const body = adapter.buildRequestBody({
+      model: 'claude-3-7-sonnet',
+      reasoningEffort: 'high',
+      messages: [
+        { role: 'system', content: [{ type: 'text', text: 'You are helpful.' }] },
+        { role: 'user', content: [{ type: 'text', text: 'Run ls' }] },
+        {
+          role: 'assistant',
+          content: [
+            { type: 'text', text: 'Running' },
+            { type: 'tool-call', id: 'call-1', name: 'bash', arguments: '{"command":"ls"}' },
+          ],
+        },
+        { role: 'tool', toolCallId: 'call-1', content: [{ type: 'text', text: 'file1.txt\nfile2.txt' }] },
+      ],
+      tools: [{ name: 'bash', description: 'Run bash command', parameters: { type: 'object' } }],
+    })
+
+    expect(body.model).toBe('claude-3-7-sonnet')
+    expect(body.reasoning).toEqual({ effort: 'high', summary: 'detailed' })
+    expect(body.tools).toHaveLength(1)
+    expect(body.tools![0]?.name).toBe('bash')
+
+    expect(body.input).toHaveLength(5)
+    expect(body.input[0]?.role).toBe('system')
+    expect(body.input[1]?.role).toBe('user')
+    expect(body.input[2]?.type).toBe('function_call')
+    expect(body.input[3]?.role).toBe('assistant')
+    expect(body.input[4]?.type).toBe('function_call_output')
+    expect(body.input[4]?.call_id).toBe('call-1')
+  })
+
+  it('streams chunks with balanced blocks, reasoning, tools, and usage', async () => {
+    const adapter = new UniversalLlmAdapter(mockSupervisor)
+    const chunks: any[] = []
+
+    for await (const chunk of adapter.stream({
+      provider: 'universal-chat-provider',
+      model: 'claude-3-7-sonnet',
+      messages: [{ role: 'user', content: [{ type: 'text', text: 'Hi' }] }],
+    })) {
+      chunks.push(chunk)
+    }
+
+    expect(chunks.some(c => c.type === 'block-start' && c.blockType === 'reasoning')).toBe(true)
+    expect(chunks.some(c => c.type === 'reasoning-delta')).toBe(true)
+    expect(chunks.some(c => c.type === 'block-end' && c.block.type === 'reasoning')).toBe(true)
+
+    expect(chunks.some(c => c.type === 'block-start' && c.blockType === 'text')).toBe(true)
+    expect(chunks.some(c => c.type === 'text-delta' && c.text === 'Here is the ')).toBe(true)
+    expect(chunks.some(c => c.type === 'block-end' && c.block.type === 'text')).toBe(true)
+
+    expect(chunks.some(c => c.type === 'block-start' && c.blockType === 'tool-call')).toBe(true)
+    expect(chunks.some(c => c.type === 'tool-call-delta' && c.id === 'call-1')).toBe(true)
+
+    expect(chunks.some(c => c.type === 'usage' && c.usage.totalTokens === 35)).toBe(true)
+    expect(chunks[chunks.length - 1]).toEqual({ type: 'finish', reason: { kind: 'tool-calls' } })
+  })
+
+  it('resolves model info and limits from discovery', async () => {
+    const adapter = new UniversalLlmAdapter(mockSupervisor)
+    const model = await adapter.resolveModel('universal-chat-provider', 'claude-3-7-sonnet')
+
+    expect(model.id).toBe('claude-3-7-sonnet')
+    expect(model.context?.contextWindow).toBe(200000)
+    expect(model.defaultMaxTokens).toBe(8192)
+    expect(model.reasoning?.efforts[0]?.id).toBe('high')
+  })
+})

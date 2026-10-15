@@ -1,0 +1,49 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Build artifacts
+dist/
+lib/
+*.tsbuildinfo
+
+# Logs
+*.log
+npm-debug.log*
+pnpm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Environment and secrets
+.env
+.env.local
+.env.*.local
+
+# Operating System files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# IDE and Editor files
+.idea/
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/extensions.json
+*.sublime-workspace
+*.sublime-project
+*.swp
+*.swo
+
+# Test coverage
+coverage/
+.nyc_output/
+
+# Temporary and test runtime directories
+tmp/
+temp/
+.dsh/

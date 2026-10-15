@@ -1,0 +1,4 @@
+- insert:
+    - id: universal-provider
+      name: 'universal-provider'
+      config: {}
