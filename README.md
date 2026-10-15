@@ -29,10 +29,10 @@ El resultado es un paquete distribuible precompilado (`.tgz`) que se integra de 
 - Node.js 22+ y pnpm instalados (o usando las herramientas empaquetadas en `$DSH_HOME/dsh-runtimes/`).
 
 ### Instalación en un perfil
-El plugin se distribuye como un archivo tarball precompilado (`universal-provider-1.0.0.tgz`). Para instalarlo en el perfil deseado (por ejemplo, `default` o un perfil personalizado):
+El plugin se distribuye como un archivo tarball precompilado (`universal-provider-0.30.0.tgz`). Para instalarlo en el perfil deseado (por ejemplo, `default` o un perfil personalizado):
 
 ```bash
-dsh plugin --profile <tu-perfil> add /ruta/a/universal-provider-1.0.0.tgz
+dsh plugin --profile <tu-perfil> add /ruta/a/universal-provider-0.30.0.tgz
 ```
 
 Al iniciar DSH con ese perfil (`dsh --profile <tu-perfil>`), el plugin se activará automáticamente sin necesidad de scripts de compilación adicionales.
@@ -136,11 +136,3 @@ Para ejecutar las pruebas:
 ```bash
 pnpm test
 ```
-
----
-
-## 7. Licencia y Atribuciones
-
-- Licencia MIT.
-- Se preservan las atribuciones y referencias originales de [vscode-universal-chat-provider](https://github.com/maxdewald/vscode-universal-chat-provider) bajo licencia MIT.
-- El repositorio upstream permanece en `upstream/` como referencia inmutable sin modificaciones.
