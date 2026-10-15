@@ -1,6 +1,6 @@
 {
   "name": "universal-provider",
-  "version": "0.30.0",
+  "version": "0.30.1",
   "description": "Universal Chat Provider for DeepSeek Harness: OAuth accounts, compatible endpoints, models, streaming, tools, and quotas",
   "type": "module",
   "main": "lib/index.js",
@@ -45,13 +45,14 @@
       "immediately": true,
       "inject": [
         "@deepseek-ai/dsh-api-remotes",
-        "@deepseek-ai/dsh-client-ui-settings"
+        "@deepseek-ai/dsh-client-ui-slots",
+        "@deepseek-ai/dsh-client-ui-plugin-manager"
       ]
     }
   },
   "license": "MIT",
   "scripts": {
-    "build": "tsdown && node scripts/build-typert.mjs",
+    "build": "node scripts/clean-build.mjs && node scripts/build-typert.mjs && tsdown",
     "test": "vitest run"
   },
   "peerDependencies": {
@@ -70,18 +71,20 @@
   "devDependencies": {
     "@deepseek-ai/cordis": "4.0.5-alpha.1",
     "@deepseek-ai/dsh": "0.2.1-alpha.2",
+    "@deepseek-ai/dsh-client-ui-plugin-manager": "0.2.1-alpha.2",
+    "@deepseek-ai/dsh-client-ui-renderer": "0.2.1-alpha.2",
+    "@deepseek-ai/dsh-home-paths": "0.2.1-alpha.2",
     "@deepseek-ai/dsh-typert-generator": "0.2.1-alpha.2",
     "@deepseek-ai/dsh-typert-loader": "0.2.1-alpha.2",
     "@deepseek-ai/dsh-typert-protocol": "0.2.1-alpha.2",
     "@deepseek-ai/schemastery": "3.18.5-alpha.1",
     "@types/node": "^22.18.0",
     "@types/react": "^18.2.0",
+    "@types/semver": "^7.7.0",
     "react": "^18.2.0",
     "tsdown": "^0.22.2",
     "typescript": "^6.0.3",
     "vitest": "^3.0.0",
-    "zod": "^4.4.3",
-    "@types/semver": "^7.7.0",
-    "@deepseek-ai/dsh-home-paths": "0.2.1-alpha.2"
+    "zod": "^4.4.3"
   }
 }

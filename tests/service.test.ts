@@ -1,8 +1,43 @@
 import { describe, expect, it } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
-import { UniversalProviderService } from '../src/index.ts'
+import { apply, inject, UniversalProviderService } from '../src/index.ts'
 
 describe('UniversalProviderService RPC Methods', () => {
+  it('activates with declared llm injection and serves RPCs without optional host services', async () => {
+    const root = new Context()
+    let adapterRegistered = false
+    const removeLlm = root.provide('llm', {
+      registerAdapter: () => { adapterRegistered = true },
+      registerConfigurableProviders: () => {},
+    })
+    const fiber = root.plugin({ apply, inject }, {
+      serverMode: 'external',
+      externalUrl: 'http://127.0.0.1:8317',
+      apiKeyEnv: 'UNIVERSAL_PROVIDER_TEST_ABSENT_API_KEY',
+      managementKeyEnv: 'UNIVERSAL_PROVIDER_TEST_ABSENT_MANAGEMENT_KEY',
+      serverVersion: 'latest',
+      requestLogging: false,
+      port: 8317,
+    })
+    try {
+      await fiber
+      expect(adapterRegistered).toBe(true)
+      for (const name of ['credentials', 'subprocess', 'configEditor']) {
+        expect(root.get(name)).toBeUndefined()
+      }
+      const service = root.get('universalProvider')!
+      expect(service).toBeDefined()
+      expect(await service.ping()).toMatchObject({ message: 'pong' })
+      expect(await service.getState()).toMatchObject({ status: 'ready', mode: 'external' })
+      expect(await service.generateCommitDraft({ cwd: '.' })).toMatchObject({ hasStagedChanges: false })
+      expect(await service.configureTitles('model')).toBe(true)
+      expect(await service.configureCompaction('model')).toBe(true)
+    } finally {
+      await fiber.dispose()
+      removeLlm()
+    }
+  })
+
   const mockSupervisor = {
     ensureRunning: async () => ({
       baseUrl: 'http://127.0.0.1:8317',

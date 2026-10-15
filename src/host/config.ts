@@ -12,7 +12,7 @@ export const Config = z.object({
   port: z.number().default(8317).description('Puerto local preferido para el servidor managed.'),
 })
 
-export type ProviderConfig = z.TypeOf<typeof Config>
+export type ProviderConfig = ReturnType<typeof Config>
 
 export function generateSecret(): string {
   return randomBytes(32).toString('hex')

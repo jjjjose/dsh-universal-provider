@@ -61,7 +61,7 @@ export class UniversalProviderService extends TypertRemoteService {
         status: 'ready',
         version: running.version || 'unknown',
         mode: running.mode,
-        port: running.port,
+        ...(running.port !== undefined ? { port: running.port } : {}),
         activeRequests: this.supervisor.getActiveRequests(),
         baseUrl: running.baseUrl,
       }
@@ -86,10 +86,10 @@ export class UniversalProviderService extends TypertRemoteService {
     const raw = await mgmt.listAuthFilesRaw(signal)
     return raw.map(file => ({
       name: file.name || file.auth_index || 'unknown',
-      type: file.type,
-      provider: file.provider,
-      email: file.email,
-      label: file.label,
+      ...(file.type !== undefined ? { type: file.type } : {}),
+      ...(file.provider !== undefined ? { provider: file.provider } : {}),
+      ...(file.email !== undefined ? { email: file.email } : {}),
+      ...(file.label !== undefined ? { label: file.label } : {}),
     }))
   }
 
@@ -146,7 +146,12 @@ export class UniversalProviderService extends TypertRemoteService {
     return providers.map(p => ({
       name: p.name,
       baseUrl: p['base-url'],
-      models: p.models?.map(m => ({ name: m.name, alias: m.alias })),
+      ...(p.models !== undefined ? {
+        models: p.models.map(m => ({
+          name: m.name,
+          ...(m.alias !== undefined ? { alias: m.alias } : {}),
+        })),
+      } : {}),
     }))
   }
 
@@ -164,7 +169,12 @@ export class UniversalProviderService extends TypertRemoteService {
       name: endpoint.name,
       'base-url': endpoint.baseUrl,
       ...(endpoint.apiKey ? { keys: [{ 'api-key': endpoint.apiKey }] } : {}),
-      ...(endpoint.models ? { models: endpoint.models.map(m => ({ name: m.name, alias: m.alias })) } : {}),
+      ...(endpoint.models ? {
+        models: endpoint.models.map(m => ({
+          name: m.name,
+          ...(m.alias !== undefined ? { alias: m.alias } : {}),
+        })),
+      } : {}),
     }
 
     if (existingIndex >= 0) {
@@ -189,12 +199,12 @@ export class UniversalProviderService extends TypertRemoteService {
       provider: r.provider,
       windows: r.windows.map(w => ({
         label: w.label,
-        remainingPercent: w.remainingPercent,
-        balance: w.balance,
-        resetsAt: w.resetsAt,
+        ...(w.remainingPercent !== undefined ? { remainingPercent: w.remainingPercent } : {}),
+        ...(w.balance !== undefined ? { balance: w.balance } : {}),
+        ...(w.resetsAt !== undefined ? { resetsAt: w.resetsAt } : {}),
       })),
-      account: r.account,
-      error: r.error,
+      ...(r.account !== undefined ? { account: r.account } : {}),
+      ...(r.error !== undefined ? { error: r.error } : {}),
     }))
   }
 

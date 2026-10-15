@@ -23,6 +23,7 @@ describe('Server Supervisor and Config', () => {
 
   it('initializes external server mode without spawning subprocess', async () => {
     const mockCtx = {
+      get(name: string) { return this[name] },
       credentials: {
         resolve: async (ref: string) => ({ value: `key-for-${ref}` }),
       },

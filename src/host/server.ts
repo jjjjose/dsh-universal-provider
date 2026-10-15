@@ -22,9 +22,9 @@ export class ServerSupervisor {
   private managedHandle?: any
   private client?: CLIProxyClient
   private managementClient?: ManagementClient
-  private info?: RunningServerInfo
-  private lockFd?: number
-  private startingPromise?: Promise<RunningServerInfo>
+  private info: RunningServerInfo | undefined
+  private lockFd: number | undefined
+  private startingPromise: Promise<RunningServerInfo> | undefined
 
   constructor(
     private readonly ctx: Context,
@@ -116,7 +116,7 @@ export class ServerSupervisor {
       binDir: this.paths.binDir,
       requestedVersion: this.config.serverVersion,
       log: msg => (this.ctx as any).logger?.info?.(msg),
-      signal,
+      ...(signal !== undefined ? { signal } : {}),
     })
 
     const port = await this.getFreePort(this.config.port)
@@ -137,7 +137,7 @@ export class ServerSupervisor {
     const baseUrl = `http://127.0.0.1:${port}`
 
     // Spawn via ctx.subprocess
-    const subprocess = (this.ctx as any).subprocess
+    const subprocess = this.ctx.get('subprocess')
     if (subprocess && typeof subprocess.spawn === 'function') {
       this.managedHandle = subprocess.spawn({
         argv: [binaryPath, '--config', this.paths.configPath],
@@ -190,7 +190,7 @@ export class ServerSupervisor {
   }
 
   private async resolveCredential(ref: string): Promise<string | undefined> {
-    const creds = (this.ctx as any).credentials
+    const creds = this.ctx.get('credentials')
     if (creds && typeof creds.resolve === 'function') {
       const hit = await creds.resolve(ref)
       if (hit?.value) return hit.value

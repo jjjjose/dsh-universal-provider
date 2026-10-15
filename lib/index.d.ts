@@ -562,7 +562,7 @@ declare const Config: z<Schemastery.ObjectS<NoInfer<{
   requestLogging: z<boolean, boolean, "defined">;
   port: z<number, number, "defined">;
 }>>, "plain">;
-type ProviderConfig = z.TypeOf<typeof Config>;
+type ProviderConfig = ReturnType<typeof Config>;
 //#endregion
 //#region src/core/models/model.d.ts
 declare const ProxyModelListEntrySchema: import("@sinclair/typebox").TObject<{
@@ -645,9 +645,9 @@ declare class ServerSupervisor {
   private managedHandle?;
   private client?;
   private managementClient?;
-  private info?;
-  private lockFd?;
-  private startingPromise?;
+  private info;
+  private lockFd;
+  private startingPromise;
   constructor(ctx: Context, paths: ProviderPaths, config: ProviderConfig);
   getFreePort(preferred?: number): Promise<number>;
   acquireRequest(): Promise<() => void>;

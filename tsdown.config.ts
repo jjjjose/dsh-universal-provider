@@ -23,6 +23,8 @@ const decoratorLoweringPlugin = {
   },
 }
 
+// `npm run build` cleans lib and generates Typert before either bundle starts.
+// Both outputs share lib with those generated inputs, so neither may clean it.
 export default defineConfig([
   {
     entry: ['src/index.ts', 'src/types.ts'],

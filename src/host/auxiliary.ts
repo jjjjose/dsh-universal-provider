@@ -16,7 +16,7 @@ export async function generateCommitDraft(
 
   // 1. Get staged diff using ctx.subprocess
   let diffOutput = ''
-  const subprocess = (ctx as any).subprocess
+  const subprocess = ctx.get('subprocess')
   if (subprocess && typeof subprocess.spawn === 'function') {
     const handle = subprocess.spawn({
       argv: ['git', 'diff', '--cached'],
@@ -73,7 +73,7 @@ export async function configureAuxiliaryTitles(
   ctx: Context,
   model: string,
 ): Promise<void> {
-  const configEditor = (ctx as any).configEditor
+  const configEditor = ctx.get('configEditor')
   if (!configEditor || typeof configEditor.edit !== 'function') return
 
   const entries = configEditor.entries()
@@ -91,7 +91,7 @@ export async function configureAuxiliaryCompaction(
   ctx: Context,
   model: string,
 ): Promise<void> {
-  const configEditor = (ctx as any).configEditor
+  const configEditor = ctx.get('configEditor')
   if (!configEditor || typeof configEditor.edit !== 'function') return
 
   const entries = configEditor.entries()

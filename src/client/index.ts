@@ -1,25 +1,22 @@
 import { waitForOAuth } from './oauth-flow.ts'
+import type { PluginConfigViewProps } from '@deepseek-ai/dsh-client-ui-plugin-manager/client'
+import type { SlotRegistry } from '@deepseek-ai/dsh-client-ui-renderer/client'
 
-export const inject = ['slots']
+export const inject = ['slots', 'remote']
 
-export function apply(ctx: any) {
-  // Mount Remote descriptors
-  if (ctx.remote && typeof ctx.remote.$mount === 'function') {
-    try {
-      const remote = require('universal-provider/remote')
-      if (remote && remote.default) {
-        ctx.remote.$mount(remote.default)
-      }
-    } catch {}
+export async function apply(ctx: { slots: Pick<SlotRegistry, 'inject' | 'register'>; remote: any }) {
+  let mountError: string | null = null
+  try {
+    const descriptors = require('universal-provider/remote')
+    if (!descriptors?.default) throw new Error('No se encontraron los descriptores remotos de Universal Provider.')
+    await ctx.remote.$mount(descriptors.default)
+    if (!ctx.remote.universalProvider) throw new Error('El servicio remoto Universal Provider no está disponible.')
+  } catch (error) {
+    mountError = `No se pudo inicializar Universal Provider: ${error instanceof Error ? error.message : String(error)}`
   }
 
-  // Register this management page inside Plugins → Universal Provider.
-  if (ctx.slots && typeof ctx.slots.inject === 'function') {
-    const dispose = ctx.slots.inject('plugins.bundle.config', () => ctx.slots.register({
-      name: 'plugins.bundle.config',
-      key: 'universal-provider',
-      label: () => 'Universal Provider',
-    }, function UniversalProviderSettingsView(props: any) {
+  // Both official configuration slots share the same management page.
+  function UniversalProviderSettingsView(props: PluginConfigViewProps) {
         const React = typeof require !== 'undefined' ? require('react') : (window as any).React
         const h = React.createElement
         const useState = React.useState as <T>(initial: T | (() => T)) => [T, (value: T | ((previous: T) => T)) => void]
@@ -47,7 +44,7 @@ export function apply(ctx: any) {
         const [newEndpointUrl, setNewEndpointUrl] = useState('')
         const [newEndpointKey, setNewEndpointKey] = useState('')
 
-        const remote = ctx.remote?.universalProvider
+        const remote = mountError ? null : ctx.remote.universalProvider
 
         const refreshStatus = async () => {
           if (!remote) return
@@ -116,7 +113,10 @@ export function apply(ctx: any) {
 
         useEffect(() => {
           oauthFlow.mounted = true
-          if (props.view === 'page') refreshStatus()
+          if (props.view === 'page') {
+            void refreshStatus()
+            void refreshAccounts()
+          }
           return () => {
             oauthFlow.mounted = false
             oauthFlow.controller?.abort()
@@ -255,17 +255,6 @@ export function apply(ctx: any) {
               h('p', { style: { margin: '4px 0 0', fontSize: '13px', color: 'var(--dsw-alias-text-secondary, #94a3b8)' } },
                 'Cuentas OAuth y endpoints OpenAI compatibles para DeepSeek Harness.'),
             ]),
-            props.close ? h('button', {
-              onClick: props.close,
-              style: {
-                padding: '6px 12px',
-                borderRadius: '6px',
-                border: '1px solid var(--dsw-alias-border, #475569)',
-                background: 'transparent',
-                color: 'var(--dsw-alias-text-primary, #e2e8f0)',
-                cursor: 'pointer',
-              },
-            }, 'Cerrar') : null,
           ]),
 
           h('div', { key: 'tabs', style: { marginBottom: '20px', borderBottom: '1px solid var(--dsw-alias-border, #334155)', paddingBottom: '12px' } }, [
@@ -276,8 +265,9 @@ export function apply(ctx: any) {
             tabButton('logs', 'Diagnóstico'),
           ]),
 
-          error ? h('div', {
+          (mountError || error) ? h('div', {
             key: 'error',
+            role: 'alert',
             style: {
               padding: '10px 14px',
               backgroundColor: 'rgba(239, 68, 68, 0.15)',
@@ -287,7 +277,7 @@ export function apply(ctx: any) {
               fontSize: '13px',
               marginBottom: '16px',
             },
-          }, error) : null,
+          }, mountError || error) : null,
 
           // Tab: Status
           tab === 'status' ? h('div', { key: 'status-content', style: { lineHeight: '1.6' } }, [
@@ -551,9 +541,15 @@ export function apply(ctx: any) {
             }, logs.length > 0 ? logs.join('\n') : 'Sin registros disponibles.'),
           ]) : null,
         ])
-    }))
-    if (typeof ctx.effect === 'function') {
-      ctx.effect(() => () => dispose(), 'universal-provider: plugin config page')
-    }
   }
+
+  // SlotRegistry owns the inject effects and unregisters entries on disposal.
+  ctx.slots.inject('plugins.bundle.config', () => ctx.slots.register({
+    name: 'plugins.bundle.config',
+    key: 'universal-provider',
+  }, UniversalProviderSettingsView))
+  ctx.slots.inject('plugins.row.config', () => ctx.slots.register({
+    name: 'plugins.row.config',
+    key: 'universal-provider#universal-provider',
+  }, UniversalProviderSettingsView))
 }

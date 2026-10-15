@@ -39,6 +39,12 @@ importers:
       '@deepseek-ai/dsh':
         specifier: 0.2.1-alpha.2
         version: 0.2.1-alpha.2(f92d14236db9a9db8361454145f1518f)
+      '@deepseek-ai/dsh-client-ui-plugin-manager':
+        specifier: 0.2.1-alpha.2
+        version: 0.2.1-alpha.2(@deepseek-ai/cordis@4.0.5-alpha.1)
+      '@deepseek-ai/dsh-client-ui-renderer':
+        specifier: 0.2.1-alpha.2
+        version: 0.2.1-alpha.2(@deepseek-ai/cordis@4.0.5-alpha.1)
       '@deepseek-ai/dsh-home-paths':
         specifier: 0.2.1-alpha.2
         version: 0.2.1-alpha.2(@deepseek-ai/cordis@4.0.5-alpha.1)

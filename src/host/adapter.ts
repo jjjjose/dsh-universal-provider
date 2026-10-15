@@ -75,6 +75,7 @@ export class UniversalLlmAdapter {
         const catalogMatch = this.catalogs ? matchCatalogModel(entry.id, this.catalogs.router) : undefined
 
         const name = metadata?.display_name || catalogMatch?.display_name || entry.id
+        const description = metadata?.description || catalogMatch?.description
         const modalities: ('text' | 'image')[] = ['text']
         if (metadata?.input_modalities?.includes('image') || catalogMatch?.supportedInputModalities?.includes('image')) {
           modalities.push('image')
@@ -84,7 +85,7 @@ export class UniversalLlmAdapter {
           provider,
           id: entry.id,
           name,
-          description: metadata?.description || catalogMatch?.description,
+          ...(description !== undefined ? { description } : {}),
           inputModalities: modalities,
         }
       })
@@ -143,7 +144,7 @@ export class UniversalLlmAdapter {
       ...(reasoningEfforts ? {
         reasoning: {
           efforts: reasoningEfforts,
-          defaultEffort: reasoningEfforts[0]?.id,
+          ...(reasoningEfforts[0] !== undefined ? { defaultEffort: reasoningEfforts[0].id } : {}),
         },
       } : {}),
     }

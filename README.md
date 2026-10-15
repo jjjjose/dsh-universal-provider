@@ -48,13 +48,28 @@ Para crear una distribución local, los mantenedores ejecutan `pnpm run build` a
 de empaquetar.
 
 ### Instalación en un perfil
-El plugin se distribuye como un archivo tarball precompilado (`universal-provider-0.30.0.tgz`). Para instalarlo en el perfil deseado (por ejemplo, `default` o un perfil personalizado):
+El plugin se distribuye como un archivo tarball precompilado (`universal-provider-0.30.1.tgz`). Para instalarlo en el perfil deseado (por ejemplo, `default` o un perfil personalizado):
 
 ```bash
-dsh plugin --profile <tu-perfil> add /ruta/a/universal-provider-0.30.0.tgz
+dsh plugin --profile <tu-perfil> add /ruta/a/universal-provider-0.30.1.tgz
 ```
 
 Al iniciar DSH con ese perfil (`dsh --profile <tu-perfil>`), el plugin se activará automáticamente sin necesidad de scripts de compilación adicionales.
+
+La versión `0.30.1` corrige el fallo de arranque web `universal-provider: failed`
+causado por acceder al servicio `remote` sin declararlo en el cliente. Si tienes
+instalada `0.30.0`, desinstala el paquete anterior desde **Plugins** y luego instala
+el paquete actualizado en el mismo perfil. DSH rechaza instalar sobre un paquete
+existente cuando HMR está activo. La desinstalación del paquete conserva los datos
+del proveedor; no ejecutes la limpieza de credenciales descrita más abajo.
+Si el fallo impide abrir la aplicación, ciérrala y usa la CLI:
+
+```bash
+dsh plugin --profile desktop remove universal-provider
+dsh plugin --profile desktop add /ruta/a/universal-provider-0.30.1.tgz
+```
+
+Sustituye `desktop` si utilizas otro perfil y vuelve a abrir DeepSeek Harness.
 
 ### Desinstalación
 Para desinstalar el paquete del perfil:
@@ -106,7 +121,7 @@ La configuración y gestión de cuentas se realizan desde **Plugins → Universa
 
 ## 4. Uso del Panel de Gestión
 
-En **Plugins**, abre los detalles de **Universal Provider**. El panel de gestión aparece debajo de la descripción del plugin; las cuentas OAuth se muestran al entrar:
+En **Plugins**, abre los detalles de **Universal Provider**. El panel de gestión aparece debajo de la descripción del plugin; también puedes abrirlo desde **Configurar** en la fila `universal-provider`. El plugin debe estar habilitado. Las cuentas OAuth se cargan al entrar:
 
 1. **Estado:** Muestra si el servidor está listo (`ready`), el modo activo, el puerto y el conteo de peticiones activas.
 2. **Cuentas OAuth:**

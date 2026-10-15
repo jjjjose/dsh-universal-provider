@@ -9,6 +9,7 @@ describe('Auxiliary Models and Commits', () => {
   it('returns hasStagedChanges: false without calling model when diff is empty', async () => {
     let modelCalled = false
     const mockCtx = {
+      get(name: string) { return this[name] },
       subprocess: {
         spawn: () => ({
           done: Promise.resolve({ exitCode: 0 }),
@@ -32,6 +33,7 @@ describe('Auxiliary Models and Commits', () => {
   it('generates conventional commit draft when staged changes exist', async () => {
     let promptReceived = ''
     const mockCtx = {
+      get(name: string) { return this[name] },
       subprocess: {
         spawn: () => ({
           done: Promise.resolve({ exitCode: 0 }),
@@ -63,6 +65,7 @@ describe('Auxiliary Models and Commits', () => {
       options: {},
     }
     const mockCtx = {
+      get(name: string) { return this[name] },
       configEditor: {
         entries: () => [mockTitleEntry],
         edit: async (_entry: any, mutate: (c: any) => any) => {
@@ -91,6 +94,7 @@ describe('Auxiliary Models and Commits', () => {
       options: {},
     }
     const mockCtx = {
+      get(name: string) { return this[name] },
       configEditor: {
         entries: () => [mockCompactionEntry],
         edit: async (_entry: any, mutate: (c: any) => any) => {

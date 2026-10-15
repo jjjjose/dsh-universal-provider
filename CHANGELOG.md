@@ -8,6 +8,14 @@ El formato se basa en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/
 
 ## [Unreleased]
 
+## [0.30.1] - 2026-10-15
+
+### Corregido
+- **Activación del cliente:** Se declara la dependencia del servicio `remote` y se espera el montaje de sus contratos, evitando el fallo `cannot get property "remote" without inject`.
+- **Acceso a configuración:** Se añade el acceso **Configurar** de la fila del plugin, reutilizando el panel del paquete.
+- **Carga inicial de cuentas:** El panel consulta las cuentas OAuth al abrirse.
+- **Orden de compilación:** Los contratos Typert se generan antes de empaquetar el cliente para evitar incorporar artefactos anteriores.
+
 ### Mejorado
 - **Panel visible en Plugins:** El cliente declara el servicio `slots`, se carga de inmediato y registra la gestión en `plugins.bundle.config`, con botones de cuentas directamente en la página del plugin.
 - **Instalación desde Git sin scripts:** Se eliminan `prepare` y `prepack`; las instalaciones consumen `lib/` precompilado y no requieren incluir el paquete en la allowlist `allowBuilds` de pnpm.
