@@ -21,7 +21,7 @@ export async function apply(ctx: ClientContext) {
     registerSettings(ctx, `No se pudo inicializar Universal Provider: ${error instanceof Error ? error.message : String(error)}`)
     return
   }
-  return ctx.inject(['remote.universalProvider', 'slots'], child => registerSettings(child))
+  return ctx.inject(['remote.universalProvider', 'remote.llm', 'slots'], child => registerSettings(child))
 }
 
 function registerSettings(ctx: ClientContext, mountError: string | null = null) {
@@ -173,8 +173,7 @@ function registerSettings(ctx: ClientContext, mountError: string | null = null) 
             if (!oauthFlow.mounted) return
             if (result.status === 'ok') {
               setOauthStatus('ok')
-              await refreshAccounts()
-              await refreshModelList()
+              await Promise.all([refreshAccounts(), refreshModelList(), refreshStatus()])
             } else if (result.status === 'error') {
               setOauthStatus('error')
               setError(result.error)

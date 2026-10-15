@@ -5,7 +5,7 @@ import { describe, expect, it, vi } from 'vitest'
 
 // Exercise the client entry as DSH loads it, with its runtime require boundary.
 // The small hook driver runs page effects without adding a DOM dependency.
-function loadClient(remoteModule: unknown = { default: {} }) {
+function loadClient(remoteModule: unknown = { default: {} }, browser: any = {}, waitForOAuth = vi.fn().mockResolvedValue({ status: 'ok' })) {
   const states: unknown[] = []
   const effects: (() => unknown)[] = []
   let cursor = 0
@@ -31,12 +31,20 @@ function loadClient(remoteModule: unknown = { default: {} }) {
     require: (id: string) => {
       if (id === 'react') return react
       if (id === 'universal-provider/remote') return remoteModule
-      if (id === './oauth-flow.ts') return {}
+      if (id === './oauth-flow.ts') return { waitForOAuth }
       throw new Error(`Unexpected client dependency: ${id}`)
     },
+    window: browser,
+    AbortController,
   })
   return {
     client: exports,
+    renderTree(component: any) {
+      cursor = 0
+      const tree = component({ view: 'page' })
+      firstRender = false
+      return tree
+    },
     render(component: any, view = 'page') {
       cursor = 0
       const tree = component({ view })
@@ -53,9 +61,12 @@ function context(client: any, mount = vi.fn().mockResolvedValue(undefined)) {
   const api = {
     getState: vi.fn().mockResolvedValue({ status: 'ready' }),
     listAccounts: vi.fn().mockResolvedValue([{ name: 'saved-account', email: 'saved@example.com' }]),
+    startOAuth: vi.fn().mockResolvedValue({ url: 'https://example.com/oauth', state: 'oauth-state' }),
+    cancelOAuth: vi.fn().mockResolvedValue(true),
   }
+  const llm = { listModels: vi.fn().mockResolvedValue([{ id: 'test-model' }]) }
   const services = {
-    remote: { $mount: mount, universalProvider: api },
+    remote: { $mount: mount, universalProvider: api, llm },
     slots: {
       inject: vi.fn((_name: string, callback: () => void) => callback()),
       register: vi.fn((options: any, component: any) => {
@@ -72,8 +83,8 @@ function context(client: any, mount = vi.fn().mockResolvedValue(undefined)) {
       if (!allowed.includes(key)) throw new Error(`cannot get property ${key} without inject`)
       if (key === 'remote') return new Proxy(target.remote, {
         get(remote, property: keyof typeof target.remote) {
-          if (property === 'universalProvider' && !allowed.includes('remote.universalProvider')) {
-            throw new Error('cannot get property "remote.universalProvider" without inject')
+          if (property !== '$mount' && !allowed.includes(`remote.${property}`)) {
+            throw new Error(`cannot get property "remote.${property}" without inject`)
           }
           return remote[property]
         },
@@ -82,10 +93,37 @@ function context(client: any, mount = vi.fn().mockResolvedValue(undefined)) {
     },
   })
   const ctx = createContext(client.inject)
-  return { ctx, entries, api, dispose: async () => { for (const cleanup of cleanups) await cleanup() } }
+  return { ctx, entries, api, llm, dispose: async () => { for (const cleanup of cleanups) await cleanup() } }
 }
 
 describe('DSH client configuration entry', () => {
+  it.each(['antigravity', 'codex'])('opens OAuth immediately and refreshes models after linking %s', async provider => {
+    const popup = { closed: false, location: { href: '' }, close: vi.fn() }
+    const open = vi.fn().mockReturnValue(popup)
+    const wait = vi.fn().mockResolvedValue({ status: 'ok' })
+    const { client, renderTree, render } = loadClient(undefined, { open }, wait)
+    const { ctx, entries, api, llm } = context(client)
+    await client.apply(ctx)
+    const tree = renderTree(entries[0].component)
+    const findButton = (node: any): any => {
+      if (!node || typeof node !== 'object') return
+      if (node.type === 'button' && node.props?.key === provider) return node
+      for (const child of Array.isArray(node) ? node : node.children || []) {
+        const found = findButton(child)
+        if (found) return found
+      }
+    }
+    const connecting = findButton(tree).props.onClick()
+    expect(open).toHaveBeenCalledWith('', '_blank')
+    expect(api.startOAuth).toHaveBeenCalledWith(provider, expect.any(AbortSignal))
+    await connecting
+    expect(popup.location.href).toBe('https://example.com/oauth')
+    expect(wait).toHaveBeenCalledWith(api, 'oauth-state', expect.objectContaining({ signal: expect.any(AbortSignal) }))
+    expect(api.listAccounts).toHaveBeenCalledOnce()
+    expect(llm.listModels).toHaveBeenCalledWith('universal-chat-provider')
+    expect(render(entries[0].component)).toContain('1 modelos disponibles')
+  })
+
   it('releases the mounted remote contribution on disposal', async () => {
     const { client } = loadClient()
     const unmount = vi.fn().mockResolvedValue(undefined)
