@@ -78,7 +78,7 @@ function context(client: any, mount = vi.fn().mockResolvedValue(undefined)) {
   // Model Cordis' service-access guard, which caused the reported regression.
   const createContext = (allowed: string[]): any => new Proxy(services, {
     get(target, key: keyof typeof services | 'inject' | 'effect') {
-      if (key === 'inject') return (names: string[], callback: (ctx: any) => unknown) => callback(createContext([...allowed, ...names]))
+      if (key === 'inject') return (names: string[] | Record<string, unknown>, callback: (ctx: any) => unknown) => callback(createContext([...allowed, ...(Array.isArray(names) ? names : Object.keys(names))]))
       if (key === 'effect') return (callback: () => () => unknown) => cleanups.push(callback())
       if (!allowed.includes(key)) throw new Error(`cannot get property ${key} without inject`)
       if (key === 'remote') return new Proxy(target.remote, {

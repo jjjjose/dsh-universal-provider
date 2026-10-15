@@ -87,7 +87,8 @@ describe('Git installation package', () => {
       expect(registrations).toHaveLength(0)
       ctx.provide('remote', { $mount: mount })
       ctx.reflect.provide('remote.universalProvider', {})
-      ctx.reflect.provide('remote.llm', {})
+      // Model the reported runtime: no remote.llm service. Model discovery must
+      // not prevent the OAuth configuration buttons from being registered.
       await vi.waitFor(() => expect(mount).toHaveBeenCalledTimes(1))
       expect(registrations).toHaveLength(0)
 

@@ -21,10 +21,17 @@ export async function apply(ctx: ClientContext) {
     registerSettings(ctx, `No se pudo inicializar Universal Provider: ${error instanceof Error ? error.message : String(error)}`)
     return
   }
-  return ctx.inject(['remote.universalProvider', 'remote.llm', 'slots'], child => registerSettings(child))
+  return ctx.inject(['remote.universalProvider', 'slots'], child => registerSettings(child))
 }
 
 function registerSettings(ctx: ClientContext, mountError: string | null = null) {
+  // Model discovery is independent: an unavailable LLM namespace must not hide
+  // the configuration page or prevent accounts from being linked.
+  let llmRemote: any = null
+  if (!mountError) ctx.inject(['remote.llm'], child => {
+    llmRemote = child.remote.llm
+    child.effect(() => () => { llmRemote = null })
+  })
   // Both official configuration slots share the same management page.
   function UniversalProviderSettingsView(props: PluginConfigViewProps) {
         const React = typeof require !== 'undefined' ? require('react') : (window as any).React
@@ -134,7 +141,6 @@ function registerSettings(ctx: ClientContext, mountError: string | null = null) 
         }, [props.view])
 
         const refreshModelList = async () => {
-          const llmRemote = ctx.remote?.llm
           if (!llmRemote || typeof llmRemote.listModels !== 'function') {
             setError('La cuenta se conectó, pero no está disponible la consulta nativa de modelos de DSH.')
             return
