@@ -1,11 +1,54 @@
 import { readFileSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import { runInNewContext } from 'node:vm'
-import { Context } from '@deepseek-ai/cordis'
+import { Context, Service } from '@deepseek-ai/cordis'
 import { describe, expect, it, vi } from 'vitest'
 
 const root = new URL('../', import.meta.url)
 const pkg = JSON.parse(readFileSync(new URL('package.json', root), 'utf8'))
+
+/** Load the published client artifact the way DSH's module table does. */
+function loadClientBundle() {
+  const nodeRequire = createRequire(import.meta.url)
+  const requireSeed = (id: string) => {
+    if (id === 'react' || id === 'react/jsx-runtime') return nodeRequire(id)
+    throw new Error(`Unseeded client module: ${id}`)
+  }
+  let client: any
+  runInNewContext(readFileSync(new URL('lib/client.js', root), 'utf8'), {
+    window: { __ModuleLoader__: { load({ id, factory }: any) {
+      expect(id).toBe(pkg.name)
+      client = factory(requireSeed)
+    } } },
+    AbortController,
+    setTimeout,
+    clearTimeout,
+    console,
+  })
+  return client
+}
+
+/**
+ * Faithful `slots` service. `inject` installs the callback under the caller's
+ * fiber effect, so the registration disposer runs when that fiber unloads;
+ * `register` records the definition and returns an idempotent disposer.
+ */
+function provideSlots(ctx: Context, registrations: any[]) {
+  class TestSlots extends Service {
+    constructor() { super(ctx, 'slots') }
+    inject(_name: string, callback: () => any) {
+      return this.ctx.effect(callback)
+    }
+    register(options: any) {
+      registrations.push(options)
+      return () => {
+        const index = registrations.indexOf(options)
+        if (index !== -1) registrations.splice(index, 1)
+      }
+    }
+  }
+  return new TestSlots()
+}
 
 describe('Git installation package', () => {
   it('exposes the actual DSH bundle at the repository root', () => {
@@ -50,36 +93,19 @@ describe('Git installation package', () => {
   })
 
   it('activates the shipped client in Cordis and mounts the current remote descriptors', async () => {
-    const nodeRequire = createRequire(import.meta.url)
-    const requireSeed = (id: string) => {
-      if (id === 'react' || id === 'react/jsx-runtime') return nodeRequire(id)
-      throw new Error(`Unseeded client module: ${id}`)
-    }
-    let client: any
-    runInNewContext(readFileSync(new URL('lib/client.js', root), 'utf8'), {
-      window: { __ModuleLoader__: { load({ id, factory }: any) {
-        expect(id).toBe(pkg.name)
-        client = factory(requireSeed)
-      } } },
-      AbortController,
-      setTimeout,
-      clearTimeout,
-      console,
-    })
+    const client = loadClientBundle()
     expect(client.inject).toEqual(expect.arrayContaining(['slots', 'remote']))
 
     const ctx = new Context()
     const registrations: any[] = []
-    ctx.provide('slots', {
-      inject: (_name: string, callback: () => any) => callback(),
-      register: (options: any) => {
-        registrations.push(options)
-        return () => { registrations.splice(registrations.indexOf(options), 1) }
-      },
-    })
+    provideSlots(ctx, registrations)
     let releaseMount!: () => void
     const mounted = new Promise<void>(resolve => { releaseMount = resolve })
-    const mount = vi.fn(async (_artifact: any) => mounted)
+    const unmount = vi.fn(async () => {})
+    const mount = vi.fn(async (_artifact: any) => {
+      await mounted
+      return unmount
+    })
     const fork = ctx.plugin(client)
     try {
       // Cordis must wait for the remote service, rather than silently skipping it.
@@ -106,12 +132,42 @@ describe('Git installation package', () => {
       expect(quotaSchema(artifact).parse(quota)).toEqual(quotaSchema(generated).parse(quota))
 
       releaseMount()
+      // `apply` must settle as a successful activation and must never return the
+      // injected Fiber as an effect (Cordis rejects it: "Invalid effect").
+      await expect(fork).resolves.toBeDefined()
+      expect(fork.state).toBe(2)
       await vi.waitFor(() => expect(registrations).toEqual(expect.arrayContaining([
         expect.objectContaining({ name: 'plugins.bundle.config', key: pkg.name }),
         expect.objectContaining({ name: 'plugins.row.config', key: `${pkg.name}#universal-provider` }),
       ])))
+      // Both registrations must remain after the activation settles; a failed
+      // fiber would unload the child and drop them.
+      expect(registrations).toHaveLength(2)
     } finally {
       releaseMount()
+      await fork.dispose()
+    }
+  })
+
+  it('releases the mounted remote contribution and unregisters slots when the client unloads', async () => {
+    const client = loadClientBundle()
+    const ctx = new Context()
+    const registrations: any[] = []
+    provideSlots(ctx, registrations)
+    const unmount = vi.fn(async () => {})
+    ctx.provide('remote', { $mount: vi.fn(async () => unmount) })
+    ctx.reflect.provide('remote.universalProvider', {})
+    const fork = ctx.plugin(client)
+    try {
+      await expect(fork).resolves.toBeDefined()
+      expect(fork.state).toBe(2)
+      await vi.waitFor(() => expect(registrations).toHaveLength(2))
+      expect(unmount).not.toHaveBeenCalled()
+
+      await fork.dispose()
+      expect(unmount).toHaveBeenCalledOnce()
+      expect(registrations).toHaveLength(0)
+    } finally {
       await fork.dispose()
     }
   })

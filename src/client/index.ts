@@ -11,7 +11,7 @@ interface ClientContext {
   effect: (callback: () => (() => unknown)) => unknown
 }
 
-export async function apply(ctx: ClientContext) {
+export async function apply(ctx: ClientContext): Promise<void> {
   try {
     const descriptors = require('universal-provider/remote')
     if (!descriptors?.default) throw new Error('No se encontraron los descriptores remotos de Universal Provider.')
@@ -21,7 +21,7 @@ export async function apply(ctx: ClientContext) {
     registerSettings(ctx, `No se pudo inicializar Universal Provider: ${error instanceof Error ? error.message : String(error)}`)
     return
   }
-  return ctx.inject(['remote.universalProvider', 'slots'], child => registerSettings(child))
+  ctx.inject(['remote.universalProvider', 'slots'], child => registerSettings(child))
 }
 
 function registerSettings(ctx: ClientContext, mountError: string | null = null) {

@@ -48,13 +48,15 @@ Para crear una distribución local, los mantenedores ejecutan `pnpm run build` a
 de empaquetar.
 
 ### Instalación en un perfil
-El plugin se distribuye como un archivo tarball precompilado (`universal-provider-0.30.1.tgz`). Para instalarlo en el perfil deseado (por ejemplo, `default` o un perfil personalizado):
+El plugin se distribuye como un archivo tarball precompilado (`universal-provider-0.30.2.tgz`). Para instalarlo en el perfil deseado (por ejemplo, `default` o un perfil personalizado):
 
 ```bash
-dsh plugin --profile <tu-perfil> add /ruta/a/universal-provider-0.30.1.tgz
+dsh plugin --profile <tu-perfil> add /ruta/a/universal-provider-0.30.2.tgz
 ```
 
 Al iniciar DSH con ese perfil (`dsh --profile <tu-perfil>`), el plugin se activará automáticamente sin necesidad de scripts de compilación adicionales.
+
+La versión `0.30.2` corrige el fallo de activación `Invalid effect` que desmontaba el plugin (sin panel ni botones) al iniciar DSH.
 
 La versión `0.30.1` corrige el fallo de arranque web `universal-provider: failed`
 causado por acceder al servicio `remote` sin declararlo en el cliente. Si tienes
@@ -66,7 +68,7 @@ Si el fallo impide abrir la aplicación, ciérrala y usa la CLI:
 
 ```bash
 dsh plugin --profile desktop remove universal-provider
-dsh plugin --profile desktop add /ruta/a/universal-provider-0.30.1.tgz
+dsh plugin --profile desktop add /ruta/a/universal-provider-0.30.2.tgz
 ```
 
 Sustituye `desktop` si utilizas otro perfil y vuelve a abrir DeepSeek Harness.

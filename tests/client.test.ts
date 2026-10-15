@@ -58,6 +58,10 @@ function loadClient(remoteModule: unknown = { default: {} }, browser: any = {}, 
 function context(client: any, mount = vi.fn().mockResolvedValue(undefined)) {
   const entries: { options: any; component: any }[] = []
   const cleanups: (() => unknown)[] = []
+  // Cordis' `ctx.inject` returns a Fiber thenable: awaiting it settles to the
+  // raw fiber (which itself has no `then`, so promise assimilation terminates).
+  const fiber: any = { state: 2, ctx: {} }
+  const fiberLike: any = { then: (resolve: (value: unknown) => void) => resolve(fiber) }
   const api = {
     getState: vi.fn().mockResolvedValue({ status: 'ready' }),
     listAccounts: vi.fn().mockResolvedValue([{ name: 'saved-account', email: 'saved@example.com' }]),
@@ -78,7 +82,10 @@ function context(client: any, mount = vi.fn().mockResolvedValue(undefined)) {
   // Model Cordis' service-access guard, which caused the reported regression.
   const createContext = (allowed: string[]): any => new Proxy(services, {
     get(target, key: keyof typeof services | 'inject' | 'effect') {
-      if (key === 'inject') return (names: string[] | Record<string, unknown>, callback: (ctx: any) => unknown) => callback(createContext([...allowed, ...(Array.isArray(names) ? names : Object.keys(names))]))
+      if (key === 'inject') return (names: string[] | Record<string, unknown>, callback: (ctx: any) => unknown) => {
+        callback(createContext([...allowed, ...(Array.isArray(names) ? names : Object.keys(names))]))
+        return fiberLike
+      }
       if (key === 'effect') return (callback: () => () => unknown) => cleanups.push(callback())
       if (!allowed.includes(key)) throw new Error(`cannot get property ${key} without inject`)
       if (key === 'remote') return new Proxy(target.remote, {
@@ -189,5 +196,11 @@ describe('DSH client configuration entry', () => {
     await new Promise(resolve => setImmediate(resolve))
     expect(render(entries[0].component)).toContain('accounts unavailable')
     expect(api.getState).toHaveBeenCalledOnce()
+  })
+
+  it('resolves application without returning the injected fiber', async () => {
+    const { client } = loadClient()
+    const { ctx } = context(client)
+    await expect(client.apply(ctx)).resolves.toBeUndefined()
   })
 })

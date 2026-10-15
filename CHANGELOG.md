@@ -8,6 +8,11 @@ El formato se basa en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/
 
 ## [Unreleased]
 
+## [0.30.2] - 2026-10-15
+
+### Corregido
+- **Arranque del cliente:** Se elimina el retorno del fiber de `ctx.inject()` en `apply`, que Cordis rechazaba como effect (`Invalid effect`), desactivaba el plugin, ocultaba el panel de gestión y los botones de vinculación, y podía impedir el arranque de la interfaz web.
+
 ## [0.30.1] - 2026-10-15
 
 ### Corregido
