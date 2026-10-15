@@ -1,3 +1,5 @@
+import { waitForOAuth } from './oauth-flow.ts'
+
 export function apply(ctx: any) {
   // Mount Remote descriptors
   if (ctx.remote && typeof ctx.remote.$mount === 'function') {
@@ -20,7 +22,7 @@ export function apply(ctx: any) {
       }, function UniversalProviderSettingsView(props: any) {
         const React = typeof require !== 'undefined' ? require('react') : (window as any).React
         const h = React.createElement
-        const useState = React.useState
+        const useState = React.useState as <T>(initial: T | (() => T)) => [T, (value: T | ((previous: T) => T)) => void]
         const useEffect = React.useEffect
 
         const [tab, setTab] = useState('status')
@@ -32,10 +34,13 @@ export function apply(ctx: any) {
         const [loading, setLoading] = useState(false)
         const [error, setError] = useState<string | null>(null)
 
-        // Form state for OAuth
-        const [selectedOAuthProvider, setSelectedOAuthProvider] = useState('codex')
+        // OAuth flow state. The stable holder lets unmount cleanup cancel the active attempt.
+        const [otherOAuthProvider, setOtherOAuthProvider] = useState('claude')
         const [oauthSession, setOauthSession] = useState<any>(null)
+        const [oauthProvider, setOauthProvider] = useState<string | null>(null)
         const [oauthStatus, setOauthStatus] = useState<string>('')
+        const oauthFlow = useState(() => ({ controller: null as AbortController | null, mounted: true }))[0]
+        const [availableModels, setAvailableModels] = useState<any[]>([])
 
         // Form state for OpenAI endpoints
         const [newEndpointName, setNewEndpointName] = useState('')
@@ -110,37 +115,73 @@ export function apply(ctx: any) {
         }
 
         useEffect(() => {
+          oauthFlow.mounted = true
           refreshStatus()
+          return () => {
+            oauthFlow.mounted = false
+            oauthFlow.controller?.abort()
+          }
         }, [])
 
-        const handleStartOAuth = async () => {
-          if (!remote) return
-          setError(null)
+        const refreshModelList = async () => {
+          const llmRemote = ctx.remote?.llm
+          if (!llmRemote || typeof llmRemote.listModels !== 'function') {
+            setError('La cuenta se conectó, pero no está disponible la consulta nativa de modelos de DSH.')
+            return
+          }
           try {
-            const res = await remote.startOAuth(selectedOAuthProvider)
+            const list = await llmRemote.listModels('universal-chat-provider')
+            setAvailableModels(list || [])
+          } catch (e: any) {
+            setError(e?.message || 'La cuenta se conectó, pero no se pudieron actualizar los modelos.')
+          }
+        }
+
+        const handleStartOAuth = async (provider: string) => {
+          if (!remote || oauthFlow.controller) return
+          setError(null)
+          setOauthProvider(provider)
+          setOauthSession(null)
+          setOauthStatus('starting')
+          const controller = new AbortController()
+          oauthFlow.controller = controller
+          // Open synchronously during the user gesture so the browser does not block the OAuth redirect.
+          const popup = window.open('', '_blank')
+          try {
+            const res = await remote.startOAuth(provider, controller.signal)
+            if (controller.signal.aborted) {
+              await remote.cancelOAuth(res.state).catch(() => undefined)
+              if (popup && !popup.closed) popup.close()
+              return
+            }
             setOauthSession(res)
             setOauthStatus('wait')
-            window.open(res.url, '_blank')
+            if (popup && !popup.closed) popup.location.href = res.url
+            else setError('El navegador bloqueó la ventana. Abre manualmente el enlace de autorización mostrado abajo.')
 
-            // Start polling
-            const pollInterval = setInterval(async () => {
-              try {
-                const poll = await remote.pollOAuth(res.state)
-                if (poll.status === 'ok') {
-                  setOauthStatus('ok')
-                  clearInterval(pollInterval)
-                  refreshAccounts()
-                } else if (poll.status === 'error') {
-                  setOauthStatus('error')
-                  setError(poll.error || 'OAuth error')
-                  clearInterval(pollInterval)
-                }
-              } catch {
-                clearInterval(pollInterval)
-              }
-            }, 2000)
+            const result = await waitForOAuth(remote, res.state, { signal: controller.signal })
+            if (!oauthFlow.mounted) return
+            if (result.status === 'ok') {
+              setOauthStatus('ok')
+              await refreshAccounts()
+              await refreshModelList()
+            } else if (result.status === 'error') {
+              setOauthStatus('error')
+              setError(result.error)
+            } else if (result.status === 'timeout') {
+              setOauthStatus('timeout')
+              setError(result.error
+                ? `No se completó el inicio de sesión a tiempo. Último error: ${result.error}`
+                : 'No se completó el inicio de sesión en 3 minutos. Puedes intentarlo de nuevo.')
+            } else {
+              setOauthStatus('cancelled')
+            }
           } catch (e: any) {
-            setError(e?.message || 'Failed to start OAuth')
+            if (popup && !popup.closed) popup.close()
+            setOauthStatus('error')
+            setError(e?.message || 'No se pudo iniciar el inicio de sesión OAuth.')
+          } finally {
+            if (oauthFlow.controller === controller) oauthFlow.controller = null
           }
         }
 
@@ -278,40 +319,69 @@ export function apply(ctx: any) {
 
           // Tab: OAuth Accounts
           tab === 'accounts' ? h('div', { key: 'accounts-content' }, [
-            h('div', { style: { marginBottom: '20px', padding: '16px', background: 'var(--dsw-alias-bg-surface-secondary, #1e293b)', borderRadius: '8px' } }, [
-              h('h3', { style: { margin: '0 0 12px', fontSize: '15px' } }, 'Añadir Nueva Cuenta OAuth'),
-              h('div', { style: { display: 'flex', gap: '10px', alignItems: 'center' } }, [
-                h('select', {
-                  value: selectedOAuthProvider,
-                  onChange: (e: any) => setSelectedOAuthProvider(e.target.value),
-                  style: { padding: '8px 12px', borderRadius: '6px', background: '#0f172a', color: '#ffffff', border: '1px solid #475569' },
-                }, [
-                  h('option', { value: 'codex' }, 'OpenAI Codex / ChatGPT'),
-                  h('option', { value: 'claude' }, 'Anthropic Claude'),
-                  h('option', { value: 'antigravity' }, 'Google Antigravity'),
-                  h('option', { value: 'kimi' }, 'Moonshot Kimi'),
-                  h('option', { value: 'xai' }, 'xAI Grok'),
-                  h('option', { value: 'devin' }, 'Devin'),
-                  h('option', { value: 'meta' }, 'Meta Muse'),
+            h('div', { style: { marginBottom: '20px', padding: '16px', background: 'var(--dsw-alias-bg-surface-secondary)', border: '1px solid var(--dsw-alias-border)', borderRadius: '8px' } }, [
+              h('h3', { style: { margin: '0 0 6px', fontSize: '15px' } }, 'Vincula tus cuentas'),
+              h('p', { style: { margin: '0 0 14px', fontSize: '13px', color: 'var(--dsw-alias-text-secondary)' } }, 'Autoriza en el navegador. Puedes agregar varias cuentas del mismo proveedor; sus modelos aparecerán en el selector de DSH.'),
+              h('div', { style: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: '10px' } }, [
+                ['antigravity', 'Google Antigravity', 'Vincular cuenta de Google'],
+                ['codex', 'ChatGPT / OpenAI Codex', 'Vincular cuenta de ChatGPT'],
+              ].map(([provider, label, detail]: any) => h('button', {
+                key: provider,
+                type: 'button',
+                disabled: !!oauthFlow.controller,
+                onClick: () => handleStartOAuth(provider),
+                style: {
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'flex-start',
+                  gap: '4px',
+                  padding: '12px 14px',
+                  borderRadius: '8px',
+                  border: '1px solid var(--dsw-alias-border)',
+                  background: 'var(--dsw-alias-bg-surface)',
+                  color: 'var(--dsw-alias-text-primary)',
+                  opacity: oauthFlow.controller ? 0.65 : 1,
+                  cursor: oauthFlow.controller ? 'not-allowed' : 'pointer',
+                  textAlign: 'left',
+                },
+              }, [
+                h('strong', { style: { fontSize: '14px' } }, oauthProvider === provider && oauthStatus === 'starting' ? 'Conectando…' : `Conectar ${label}`),
+                h('span', { style: { fontSize: '12px', color: 'var(--dsw-alias-text-secondary)' } }, detail),
+              ]))),
+              h('details', { style: { marginTop: '14px' } }, [
+                h('summary', { style: { color: 'var(--dsw-alias-text-secondary)', cursor: 'pointer', fontSize: '13px' } }, 'Otros proveedores OAuth'),
+                h('div', { style: { display: 'flex', gap: '8px', flexWrap: 'wrap', marginTop: '10px' } }, [
+                  h('select', {
+                    value: otherOAuthProvider,
+                    disabled: !!oauthFlow.controller,
+                    onChange: (e: any) => setOtherOAuthProvider(e.target.value),
+                    style: { padding: '8px 12px', borderRadius: '6px', background: 'var(--dsw-alias-bg-surface)', color: 'var(--dsw-alias-text-primary)', border: '1px solid var(--dsw-alias-border)' },
+                  }, [
+                    h('option', { value: 'claude' }, 'Anthropic Claude'),
+                    h('option', { value: 'kimi' }, 'Moonshot Kimi'),
+                    h('option', { value: 'xai' }, 'xAI Grok'),
+                    h('option', { value: 'devin' }, 'Devin'),
+                    h('option', { value: 'meta' }, 'Meta Muse'),
+                  ]),
+                  h('button', {
+                    type: 'button',
+                    disabled: !!oauthFlow.controller,
+                    onClick: () => handleStartOAuth(otherOAuthProvider),
+                    style: { padding: '8px 12px', borderRadius: '6px', border: '1px solid var(--dsw-alias-border)', background: 'transparent', color: 'var(--dsw-alias-text-primary)', cursor: oauthFlow.controller ? 'not-allowed' : 'pointer' },
+                  }, 'Conectar'),
                 ]),
-                h('button', {
-                  onClick: handleStartOAuth,
-                  style: {
-                    padding: '8px 16px',
-                    borderRadius: '6px',
-                    background: 'var(--dsw-alias-accent, #3b82f6)',
-                    color: '#ffffff',
-                    border: 'none',
-                    fontWeight: 600,
-                    cursor: 'pointer',
-                  },
-                }, 'Iniciar Inicio de Sesión'),
               ]),
-              oauthStatus === 'wait' ? h('div', { style: { marginTop: '12px', color: '#38bdf8', fontSize: '13px' } }, [
-                'Autorización abierta en el navegador. Esperando confirmación...',
-                oauthSession?.userCode ? h('div', null, `Código de usuario: ${oauthSession.userCode}`) : null,
+              oauthStatus === 'starting' ? h('div', { style: { marginTop: '12px', color: 'var(--dsw-alias-text-secondary)', fontSize: '13px' } }, `Preparando inicio de sesión de ${oauthProvider}…`) : null,
+              oauthStatus === 'wait' ? h('div', { style: { marginTop: '12px', fontSize: '13px', color: 'var(--dsw-alias-text-primary)' } }, [
+                `Esperando confirmación de ${oauthProvider} en el navegador…`,
+                oauthSession?.userCode ? h('div', { style: { marginTop: '6px', fontWeight: 600 } }, `Código de usuario: ${oauthSession.userCode}`) : null,
+                oauthSession?.url ? h('a', { href: oauthSession.url, target: '_blank', rel: 'noopener noreferrer', style: { display: 'inline-block', marginTop: '6px', color: 'var(--dsw-alias-accent)' } }, 'Abrir autorización manualmente') : null,
+                h('button', { type: 'button', onClick: () => oauthFlow.controller?.abort(), style: { display: 'block', marginTop: '8px', padding: '5px 10px', border: '1px solid var(--dsw-alias-border)', borderRadius: '6px', background: 'transparent', color: 'var(--dsw-alias-text-primary)', cursor: 'pointer' } }, 'Cancelar'),
               ]) : null,
-              oauthStatus === 'ok' ? h('div', { style: { marginTop: '12px', color: '#4ade80', fontSize: '13px' } }, '¡Cuenta vinculada con éxito!') : null,
+              oauthStatus === 'ok' ? h('div', { style: { marginTop: '12px', fontSize: '13px', color: 'var(--dsw-alias-text-primary)' } }, [
+                'Cuenta vinculada correctamente.',
+                availableModels.length ? h('div', { style: { marginTop: '5px', color: 'var(--dsw-alias-text-secondary)' } }, `${availableModels.length} modelos disponibles en el selector de DSH.`) : null,
+              ]) : null,
             ]),
 
             h('h3', { style: { margin: '0 0 12px', fontSize: '15px' } }, 'Cuentas Registradas'),

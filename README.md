@@ -13,7 +13,7 @@ El resultado es un paquete distribuible precompilado (`.tgz`) que se integra de 
 | **Ruta del Adaptador LLM** | ✅ Nativo | Registrado bajo `universal-chat-provider` en `ctx.llm`. |
 | **Streaming y Respuestas** | ✅ Completo | Traducción hacia `/v1/responses` SSE con deltas de texto, pensamiento (`thinking`), uso de tokens y finalización balanceada. |
 | **Llamadas a Herramientas** | ✅ Nativo | Las herramientas se definen, validan y ejecutan bajo las políticas y sandboxing de DSH. |
-| **Cuentas OAuth** | ✅ 7 Proveedores | OpenAI Codex, Anthropic Claude, Google Antigravity, Moonshot Kimi, xAI Grok, Devin y Meta Muse. |
+| **Cuentas OAuth** | ✅ 7 Proveedores | Botones directos para ChatGPT/Codex y Google Antigravity; los demás proveedores siguen disponibles en «Otros proveedores». Admite varias cuentas por proveedor. |
 | **Endpoints OpenAI Compatibles** | ✅ Soportado | Soporte para Ollama, vLLM, LMStudio, OpenRouter o endpoints corporativos con clave write-only. |
 | **Cuotas de Proveedores** | ✅ 5 Proveedores | Monitoreo de ventanas de uso y cálculo de resets para Codex (5h/7d), Claude, Antigravity (por modelo), Grok y Kimi. |
 | **Panel de Gestión** | ✅ Nativo | Integrado como pestaña en `Settings` (`settings.section`) con slots del cliente web y tokens de tema. |
@@ -109,9 +109,10 @@ Al abrir **Settings** en la interfaz web de DeepSeek Harness, se dispondrá de l
 
 1. **Estado:** Muestra si el servidor está listo (`ready`), el modo activo, el puerto y el conteo de peticiones activas.
 2. **Cuentas OAuth:**
-   - Selecciona el proveedor (ej: *OpenAI Codex*, *Anthropic Claude*, *Google Antigravity*).
-   - Haz clic en *Iniciar Inicio de Sesión*. Se abrirá la URL oficial del proveedor en tu navegador.
-   - Tras completar la autenticación, el servidor enlazará la cuenta y podrás verla listada con su correo y etiquetas.
+   - Haz clic en *Conectar Google Antigravity* o *Conectar ChatGPT / OpenAI Codex*; los demás proveedores OAuth compatibles están en *Otros proveedores*.
+   - Se abre el flujo oficial en el navegador. Si el navegador bloquea la ventana, usa el enlace manual mostrado en el panel.
+   - La sección espera la confirmación, permite cancelar el flujo y muestra la cuenta enlazada. Puedes repetirlo para registrar varias cuentas del mismo proveedor.
+   - Al completarse el inicio de sesión, Universal Provider actualiza la lista de cuentas y consulta los modelos mediante el registro LLM nativo de DSH; selecciónalos desde el selector de modelos.
 3. **Endpoints OpenAI Compatibles:**
    - Permite agregar endpoints locales (como Ollama en `http://localhost:11434/v1`) con alias y modelos personalizados.
 4. **Cuotas:**
