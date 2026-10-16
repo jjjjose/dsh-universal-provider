@@ -46,6 +46,7 @@ describe('UniversalProviderService RPC Methods', () => {
       version: '8.0.3',
     }),
     getActiveRequests: () => 2,
+    getProxyClient: () => ({ discover: async () => ({ available: [], metadata: [] }) }),
     getManagementClient: () => ({
       listAuthFilesRaw: async () => [
         { name: 'acc-1', auth_index: 'idx-1', provider: 'codex', email: 'test@example.com', label: 'My OpenAI' },
@@ -98,6 +99,13 @@ describe('UniversalProviderService RPC Methods', () => {
 
   const ctx = new Context()
   const service = new UniversalProviderService(ctx, mockSupervisor, paths, config)
+
+  it('exposes model discovery without a native remote.llm service', async () => {
+    expect(await service.listModels()).toEqual([])
+    const controller = new AbortController()
+    controller.abort()
+    await expect(service.listModels(controller.signal)).rejects.toThrow()
+  })
 
   it('handles ping() with timestamp', async () => {
     const res = await service.ping()

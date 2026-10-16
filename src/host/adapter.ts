@@ -3,14 +3,9 @@ import type { CLIProxyClient, ProxyRequestBody } from '../core/api/proxy-client.
 import { matchCatalogModel } from '../core/models/catalog-match.ts'
 import { fetchCatalog, type ModelCatalogs } from '../core/models/catalog.ts'
 import { ProxyHttpError } from '../core/api/errors.ts'
+import type { ModelView } from '../types.ts'
 
-export interface ModelInfo {
-  provider: string
-  id: string
-  name: string
-  description?: string
-  inputModalities?: readonly ('text' | 'image')[]
-}
+export interface ModelInfo extends ModelView {}
 
 export interface ResolvedModelInfo extends ModelInfo {
   context?: { contextWindow: number }
@@ -23,8 +18,6 @@ export interface ResolvedModelInfo extends ModelInfo {
 
 export class UniversalLlmAdapter {
   private catalogs?: ModelCatalogs
-  private lastDiscoveredModels: ModelInfo[] = []
-  private lastDiscoveredTime = 0
 
   constructor(private readonly supervisor: ServerSupervisor) {}
 
@@ -43,63 +36,45 @@ export class UniversalLlmAdapter {
     return undefined
   }
 
-  defaultFallbackModels(provider: string): ModelInfo[] {
-    return [
-      {
-        provider,
-        id: 'universal-chat',
-        name: 'Universal Chat (Auto)',
-        inputModalities: ['text'],
-        description: 'Modelo universal conectado a CLIProxyAPI.',
-      },
-    ]
+  defaultFallbackModels(_provider: string): ModelInfo[] {
+    return []
   }
 
-  async listModels(provider: string): Promise<readonly ModelInfo[]> {
-    try {
-      await this.supervisor.ensureRunning()
-      const client = this.supervisor.getProxyClient()
-      if (!client) {
-        return this.lastDiscoveredModels.length ? this.lastDiscoveredModels : this.defaultFallbackModels(provider)
-      }
-
-      const discovery = await client.discover()
-      if (!this.catalogs) {
-        try {
-          this.catalogs = await fetchCatalog()
-        } catch {}
-      }
-
-      const models: ModelInfo[] = discovery.available.map((entry) => {
-        const metadata = discovery.metadata.find(m => m.slug === entry.id)
-        const catalogMatch = this.catalogs ? matchCatalogModel(entry.id, this.catalogs.router) : undefined
-
-        const name = metadata?.display_name || catalogMatch?.display_name || entry.id
-        const description = metadata?.description || catalogMatch?.description
-        const modalities: ('text' | 'image')[] = ['text']
-        if (metadata?.input_modalities?.includes('image') || catalogMatch?.supportedInputModalities?.includes('image')) {
-          modalities.push('image')
-        }
-
-        return {
-          provider,
-          id: entry.id,
-          name,
-          ...(description !== undefined ? { description } : {}),
-          inputModalities: modalities,
-        }
-      })
-
-      if (models.length > 0) {
-        this.lastDiscoveredModels = models
-        this.lastDiscoveredTime = Date.now()
-        return models
-      }
-
-      return this.defaultFallbackModels(provider)
-    } catch {
-      return this.lastDiscoveredModels.length ? this.lastDiscoveredModels : this.defaultFallbackModels(provider)
+  async listModels(provider: string, signal?: AbortSignal): Promise<readonly ModelInfo[]> {
+    signal?.throwIfAborted()
+    await this.supervisor.ensureRunning(signal)
+    const client = this.supervisor.getProxyClient()
+    if (!client) {
+      throw new Error('No está disponible el cliente de modelos de CLIProxyAPI.')
     }
+
+    const discovery = await client.discover(signal)
+    if (!this.catalogs && discovery.available.length) {
+      try {
+        this.catalogs = await fetchCatalog()
+      } catch {}
+    }
+    signal?.throwIfAborted()
+
+    return discovery.available.map((entry) => {
+      const metadata = discovery.metadata.find(m => m.slug === entry.id)
+      const catalogMatch = this.catalogs ? matchCatalogModel(entry.id, this.catalogs.router) : undefined
+
+      const name = metadata?.display_name || catalogMatch?.display_name || entry.id
+      const description = metadata?.description || catalogMatch?.description
+      const modalities: ('text' | 'image')[] = ['text']
+      if (metadata?.input_modalities?.includes('image') || catalogMatch?.supportedInputModalities?.includes('image')) {
+        modalities.push('image')
+      }
+
+      return {
+        provider,
+        id: entry.id,
+        name,
+        ...(description !== undefined ? { description } : {}),
+        inputModalities: modalities,
+      }
+    })
   }
 
   async resolveModel(provider: string, model: string, signal?: AbortSignal): Promise<ResolvedModelInfo> {

@@ -1,4 +1,11 @@
 //#region src/types.d.ts
+interface ModelView {
+  provider: string;
+  id: string;
+  name: string;
+  description?: string;
+  inputModalities?: readonly ('text' | 'image')[];
+}
 interface PingResult {
   readonly message: string;
   readonly timestamp: number;
@@ -62,5 +69,5 @@ interface CommitDraftResult {
   readonly draft?: string;
 }
 //#endregion
-export { AccountView, CommitDraftResult, EndpointModelView, EndpointView, OAuthPollResult, OAuthStartResult, PingResult, ProviderStatus, QuotaReportView, QuotaWindowView };
+export { AccountView, CommitDraftResult, EndpointModelView, EndpointView, ModelView, OAuthPollResult, OAuthStartResult, PingResult, ProviderStatus, QuotaReportView, QuotaWindowView };
 //# sourceMappingURL=types.d.ts.map

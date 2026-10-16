@@ -1,7 +1,28 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { UniversalLlmAdapter } from '../src/host/adapter.ts'
 
+vi.mock('../src/core/models/catalog.ts', () => ({ fetchCatalog: async () => { throw new Error('offline') } }))
+
 describe('UniversalLlmAdapter', () => {
+  it('discovers all providers and removes models when their accounts disappear', async () => {
+    const discover = vi.fn().mockResolvedValue({
+      available: ['gemini-test', 'gpt-test', 'claude-test', 'endpoint-model'].map(id => ({ id })),
+      metadata: [],
+    })
+    const adapter = new UniversalLlmAdapter({
+      ensureRunning: async () => {},
+      getProxyClient: () => ({ discover }),
+    } as any)
+    expect((await adapter.listModels('universal-chat-provider')).map(m => m.id)).toEqual([
+      'gemini-test', 'gpt-test', 'claude-test', 'endpoint-model',
+    ])
+    discover.mockResolvedValue({ available: [], metadata: [] })
+    expect(await adapter.listModels('universal-chat-provider')).toEqual([])
+    discover.mockRejectedValue(new Error('discovery unavailable'))
+    await expect(adapter.listModels('universal-chat-provider')).rejects.toThrow('discovery unavailable')
+    expect(adapter.defaultFallbackModels('universal-chat-provider')).toEqual([])
+  })
+
   const mockSupervisor = {
     ensureRunning: async () => {},
     acquireRequest: async () => () => {},

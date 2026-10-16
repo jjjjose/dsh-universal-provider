@@ -1,8 +1,37 @@
-import { describe, expect, it } from 'vitest'
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
+import http from 'node:http'
 import { Context } from '@deepseek-ai/cordis'
 import * as UniversalPlugin from '../src/index.ts'
 
+vi.mock('../src/core/models/catalog.ts', () => ({ fetchCatalog: async () => { throw new Error('offline') } }))
+
 describe('Universal Provider End-to-End Plugin Integration', () => {
+  let server: http.Server
+  let baseUrl: string
+  let requestedModel: string
+  beforeAll(async () => {
+    server = http.createServer((req, res) => {
+      if (req.url?.startsWith('/v1/models')) {
+        res.setHeader('Content-Type', 'application/json')
+        res.end(JSON.stringify({ data: ['gemini-test', 'gpt-test', 'claude-test'].map(id => ({ id, owned_by: 'test' })) }))
+      } else if (req.url === '/v1/responses') {
+        let body = ''
+        req.on('data', chunk => { body += chunk })
+        req.on('end', () => {
+          requestedModel = JSON.parse(body).model
+          res.setHeader('Content-Type', 'text/event-stream')
+          res.end('data: {"type":"response.output_text.delta","delta":"Hello"}\n\ndata: {"type":"response.completed","response":{}}\n\ndata: [DONE]\n\n')
+        })
+      } else {
+        res.writeHead(404).end()
+      }
+    })
+    await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve))
+    baseUrl = `http://127.0.0.1:${(server.address() as import('node:net').AddressInfo).port}`
+  })
+  afterAll(async () => {
+    await new Promise<void>((resolve, reject) => server.close(error => error ? reject(error) : resolve()))
+  })
   it('activates plugin, registers LLM adapter and handles RPC invocations', async () => {
     const ctx = new Context()
 
@@ -40,9 +69,9 @@ describe('Universal Provider End-to-End Plugin Integration', () => {
     }
 
     // Mount plugin
-    await ctx.plugin(UniversalPlugin, {
+    const fiber = await ctx.plugin(UniversalPlugin, {
       serverMode: 'external',
-      externalUrl: 'http://127.0.0.1:8317',
+      externalUrl: baseUrl,
       apiKeyEnv: 'API_KEY',
       managementKeyEnv: 'MGMT_KEY',
       serverVersion: '8.0.3',
@@ -50,7 +79,7 @@ describe('Universal Provider End-to-End Plugin Integration', () => {
       port: 8317,
     })
 
-    await new Promise(r => setTimeout(r, 50))
+    try {
 
     expect(ctx.universalProvider).toBeDefined()
     expect(mockLlm.configurableProviders).toHaveLength(1)
@@ -59,19 +88,22 @@ describe('Universal Provider End-to-End Plugin Integration', () => {
     // 1. Check model discovery
     const models = await mockLlm.listModels('universal-chat-provider')
     expect(models.length).toBeGreaterThan(0)
-    expect(models[0].id).toBe('universal-chat')
+    expect(models.map((model: any) => model.id)).toEqual(['gemini-test', 'gpt-test', 'claude-test'])
+    expect(await ctx.universalProvider.listModels()).toEqual(models)
 
     // 2. Check stream call
     const chunks: any[] = []
     for await (const chunk of mockLlm.stream({
       provider: 'universal-chat-provider',
-      model: 'universal-chat',
+      model: 'gpt-test',
       messages: [{ role: 'user', content: [{ type: 'text', text: 'Hello' }] }],
     })) {
       chunks.push(chunk)
     }
     expect(chunks.length).toBeGreaterThan(0)
     expect(chunks[chunks.length - 1].type).toBe('finish')
+    expect(requestedModel).toBe('gpt-test')
+    expect(chunks.some(chunk => chunk.type === 'text-delta' && chunk.text === 'Hello')).toBe(true)
 
     // 3. Check RPC ping
     const ping = await ctx.universalProvider.ping()
@@ -87,5 +119,8 @@ describe('Universal Provider End-to-End Plugin Integration', () => {
     const controller = new AbortController()
     controller.abort()
     await expect(ctx.universalProvider.ping(controller.signal)).rejects.toThrow()
+    } finally {
+      await fiber.dispose()
+    }
   })
 })

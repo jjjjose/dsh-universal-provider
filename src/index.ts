@@ -4,6 +4,7 @@ import { readFile } from 'node:fs/promises'
 import { existsSync } from 'node:fs'
 import type {
   PingResult,
+  ModelView,
   ProviderStatus,
   AccountView,
   OAuthStartResult,
@@ -39,6 +40,7 @@ export class UniversalProviderService extends TypertRemoteService {
     private readonly supervisor: ServerSupervisor,
     private readonly paths: ProviderPaths,
     private readonly config: ProviderConfig,
+    private readonly adapter = new UniversalLlmAdapter(supervisor),
   ) {
     super(ctx, 'universalProvider')
   }
@@ -74,6 +76,11 @@ export class UniversalProviderService extends TypertRemoteService {
         baseUrl: this.config.serverMode === 'external' ? this.config.externalUrl : '',
       }
     }
+  }
+
+  @Remote
+  async listModels(signal?: AbortSignal): Promise<readonly ModelView[]> {
+    return this.adapter.listModels('universal-chat-provider', signal)
   }
 
   @Remote
@@ -257,11 +264,11 @@ export function apply(ctx: Context, config: ProviderConfig) {
   const paths = resolveProviderPaths(profileId)
   const supervisor = new ServerSupervisor(ctx, paths, config)
 
-  new UniversalProviderService(ctx, supervisor, paths, config)
+  const adapter = new UniversalLlmAdapter(supervisor)
+  new UniversalProviderService(ctx, supervisor, paths, config, adapter)
 
   const llm = (ctx as any).llm
   if (llm) {
-    const adapter = new UniversalLlmAdapter(supervisor)
     llm.registerAdapter(['universal-chat-provider'], adapter)
     llm.registerConfigurableProviders([{
       provider: 'universal-chat-provider',

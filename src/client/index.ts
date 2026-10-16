@@ -26,13 +26,6 @@ export async function apply(ctx: ClientContext): Promise<void> {
 }
 
 function registerSettings(ctx: ClientContext, mountError: string | null = null) {
-  // Model discovery is independent: an unavailable LLM namespace must not hide
-  // the configuration page or prevent accounts from being linked.
-  let llmRemote: any = null
-  if (!mountError) ctx.inject(['remote.llm'], child => {
-    llmRemote = child.remote.llm
-    child.effect(() => () => { llmRemote = null })
-  })
   // Both official configuration slots share the same management page.
   function UniversalProviderSettingsView(props: PluginConfigViewProps) {
         const React = typeof require !== 'undefined' ? require('react') : (window as any).React
@@ -56,6 +49,7 @@ function registerSettings(ctx: ClientContext, mountError: string | null = null) 
         const [oauthStatus, setOauthStatus] = useState<string>('')
         const oauthFlow = useState(() => ({ controller: null as AbortController | null, mounted: true }))[0]
         const [availableModels, setAvailableModels] = useState<any[]>([])
+        const [modelsStatus, setModelsStatus] = useState('idle')
 
         // Form state for OpenAI endpoints
         const [newEndpointName, setNewEndpointName] = useState('')
@@ -133,7 +127,8 @@ function registerSettings(ctx: ClientContext, mountError: string | null = null) 
           oauthFlow.mounted = true
           if (props.view === 'page') {
             void refreshStatus()
-            void refreshAccounts()
+             void refreshAccounts()
+             void refreshModelList()
           }
           return () => {
             oauthFlow.mounted = false
@@ -142,15 +137,16 @@ function registerSettings(ctx: ClientContext, mountError: string | null = null) 
         }, [props.view])
 
         const refreshModelList = async () => {
-          if (!llmRemote || typeof llmRemote.listModels !== 'function') {
-            setError('La cuenta se conectó, pero no está disponible la consulta nativa de modelos de DSH.')
-            return
-          }
+          if (!remote) return
+          setModelsStatus('loading')
           try {
-            const list = await expectRemote<any[]>(llmRemote.listModels('universal-chat-provider'))
+            const list = await expectRemote<any[]>(remote.listModels())
             setAvailableModels(list || [])
+            setModelsStatus('ready')
           } catch (e: any) {
-            setError(e?.message || 'La cuenta se conectó, pero no se pudieron actualizar los modelos.')
+            setModelsStatus('error')
+            setAvailableModels([])
+            setError(e?.message || 'No se pudieron consultar los modelos disponibles.')
           }
         }
 
@@ -214,7 +210,7 @@ function registerSettings(ctx: ClientContext, mountError: string | null = null) 
           if (!confirm(`¿Eliminar cuenta "${name}"?`)) return
           try {
             await expectRemote(remote.deleteAccount(name))
-            refreshAccounts()
+            await Promise.all([refreshAccounts(), refreshModelList()])
           } catch (e: any) {
             setError(e?.message || 'Failed to delete account')
           }
@@ -231,7 +227,7 @@ function registerSettings(ctx: ClientContext, mountError: string | null = null) 
             setNewEndpointName('')
             setNewEndpointUrl('')
             setNewEndpointKey('')
-            refreshEndpoints()
+            await Promise.all([refreshEndpoints(), refreshModelList()])
           } catch (e: any) {
             setError(e?.message || 'Failed to save endpoint')
           }
@@ -243,8 +239,8 @@ function registerSettings(ctx: ClientContext, mountError: string | null = null) 
             setTab(id)
             setError(null)
             if (id === 'status') refreshStatus()
-            if (id === 'accounts') refreshAccounts()
-            if (id === 'endpoints') refreshEndpoints()
+            if (id === 'accounts') { refreshAccounts(); refreshModelList() }
+            if (id === 'endpoints') { refreshEndpoints(); refreshModelList() }
             if (id === 'quotas') refreshQuotas()
             if (id === 'logs') refreshLogs()
           },
@@ -355,6 +351,13 @@ function registerSettings(ctx: ClientContext, mountError: string | null = null) 
                 cursor: 'pointer',
               },
             }, loading ? 'Actualizando...' : 'Actualizar Estado'),
+          ]) : null,
+
+          (tab === 'accounts' || tab === 'endpoints') ? h('section', { key: 'models', style: { marginBottom: '20px' } }, [
+            h('h3', null, 'Modelos disponibles'),
+            h('button', { type: 'button', disabled: modelsStatus === 'loading', onClick: refreshModelList }, modelsStatus === 'loading' ? 'Consultando modelos…' : 'Actualizar modelos'),
+            modelsStatus === 'ready' && !availableModels.length ? h('p', null, 'No hay modelos disponibles para las cuentas y endpoints configurados.') : null,
+            modelsStatus === 'ready' ? h('ul', null, availableModels.map(model => h('li', { key: `${model.provider}/${model.id}` }, `${model.name} (${model.id})`))) : null,
           ]) : null,
 
           // Tab: OAuth Accounts

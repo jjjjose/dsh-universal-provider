@@ -1,4 +1,4 @@
-import { AccountView, CommitDraftResult, EndpointModelView, EndpointView, OAuthPollResult, OAuthStartResult, PingResult, ProviderStatus, QuotaReportView, QuotaWindowView } from "./types.js";
+import { AccountView, CommitDraftResult, EndpointModelView, EndpointView, ModelView, OAuthPollResult, OAuthStartResult, PingResult, ProviderStatus, QuotaReportView, QuotaWindowView } from "./types.js";
 import { Context, Service } from "@deepseek-ai/cordis";
 import z from "@deepseek-ai/schemastery";
 import { Static } from "@sinclair/typebox";
@@ -661,6 +661,43 @@ declare class ServerSupervisor {
   dispose(): Promise<void>;
 }
 //#endregion
+//#region src/host/adapter.d.ts
+interface ModelInfo extends ModelView {}
+interface ResolvedModelInfo extends ModelInfo {
+  context?: {
+    contextWindow: number;
+  };
+  defaultMaxTokens?: number;
+  reasoning?: {
+    efforts: readonly {
+      id: string;
+      name: string;
+      description?: string;
+    }[];
+    defaultEffort?: string;
+  };
+}
+declare class UniversalLlmAdapter {
+  private readonly supervisor;
+  private catalogs?;
+  constructor(supervisor: ServerSupervisor);
+  providerInfo(provider: string): {
+    id: string;
+    name: string;
+  };
+  providerRetryPolicy(_provider: string): undefined;
+  imageRequestPricing(_provider: string, _model: string): undefined;
+  defaultFallbackModels(_provider: string): ModelInfo[];
+  listModels(provider: string, signal?: AbortSignal): Promise<readonly ModelInfo[]>;
+  resolveModel(provider: string, model: string, signal?: AbortSignal): Promise<ResolvedModelInfo>;
+  prepareCall(provider: string, model: string, signal?: AbortSignal): Promise<{
+    model: ResolvedModelInfo;
+    stream: (options: any) => AsyncIterable<any>;
+  }>;
+  stream(options: any): AsyncIterable<any>;
+  buildRequestBody(options: any): ProxyRequestBody;
+}
+//#endregion
 //#region src/index.d.ts
 declare module '@deepseek-ai/cordis' {
   interface Context {
@@ -671,9 +708,11 @@ declare class UniversalProviderService extends TypertRemoteService {
   private readonly supervisor;
   private readonly paths;
   private readonly config;
-  constructor(ctx: Context, supervisor: ServerSupervisor, paths: ProviderPaths, config: ProviderConfig);
+  private readonly adapter;
+  constructor(ctx: Context, supervisor: ServerSupervisor, paths: ProviderPaths, config: ProviderConfig, adapter?: UniversalLlmAdapter);
   ping(signal?: AbortSignal): Promise<PingResult>;
   getState(signal?: AbortSignal): Promise<ProviderStatus>;
+  listModels(signal?: AbortSignal): Promise<readonly ModelView[]>;
   listAccounts(signal?: AbortSignal): Promise<AccountView[]>;
   startOAuth(provider: string, signal?: AbortSignal): Promise<OAuthStartResult>;
   pollOAuth(state: string, signal?: AbortSignal): Promise<OAuthPollResult>;
@@ -693,5 +732,5 @@ declare class UniversalProviderService extends TypertRemoteService {
 declare const inject: string[];
 declare function apply(ctx: Context, config: ProviderConfig): void;
 //#endregion
-export { AccountView, CommitDraftResult, Config, EndpointModelView, EndpointView, OAuthPollResult, OAuthStartResult, PingResult, ProviderStatus, QuotaReportView, QuotaWindowView, UniversalProviderService, apply, inject };
+export { AccountView, CommitDraftResult, Config, EndpointModelView, EndpointView, ModelView, OAuthPollResult, OAuthStartResult, PingResult, ProviderStatus, QuotaReportView, QuotaWindowView, UniversalProviderService, apply, inject };
 //# sourceMappingURL=index.d.ts.map

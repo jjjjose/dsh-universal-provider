@@ -69,12 +69,13 @@ function context(client: any, mount = vi.fn().mockResolvedValue(undefined)) {
   const api = {
     getState: vi.fn().mockResolvedValue({ ok: true, value: { status: 'ready' } }),
     listAccounts: vi.fn().mockResolvedValue({ ok: true, value: [{ name: 'saved-account', email: 'saved@example.com' }] }),
+    listModels: vi.fn().mockResolvedValue({ ok: true, value: [{ provider: 'universal-chat-provider', id: 'test-model', name: 'Test model' }] }),
     startOAuth: vi.fn().mockResolvedValue({ ok: true, value: { url: 'https://example.com/oauth', state: 'oauth-state' } }),
     cancelOAuth: vi.fn().mockResolvedValue({ ok: true, value: true }),
   }
   const llm = { listModels: vi.fn().mockResolvedValue({ ok: true, value: [{ id: 'test-model' }] }) }
   const services = {
-    remote: { $mount: mount, universalProvider: api, llm },
+    remote: { $mount: mount, universalProvider: api },
     slots: {
       inject: vi.fn((_name: string, callback: () => void) => callback()),
       register: vi.fn((options: any, component: any) => {
@@ -152,7 +153,8 @@ describe('DSH client configuration entry', () => {
     }
     expect(wait).toHaveBeenCalledWith(api, 'oauth-state', expect.objectContaining({ signal: expect.any(AbortSignal) }))
     expect(api.listAccounts).toHaveBeenCalledOnce()
-    expect(llm.listModels).toHaveBeenCalledWith('universal-chat-provider')
+    expect(api.listModels).toHaveBeenCalledOnce()
+    expect(llm.listModels).not.toHaveBeenCalled()
     expect(render(entries[0].component)).toContain('1 modelos disponibles')
   })
 
@@ -190,6 +192,8 @@ describe('DSH client configuration entry', () => {
     await new Promise(resolve => setImmediate(resolve))
     expect(api.getState).toHaveBeenCalledOnce()
     expect(api.listAccounts).toHaveBeenCalledOnce()
+    expect(api.listModels).toHaveBeenCalledOnce()
+    expect(render(entries[0].component)).toContain('Test model (test-model)')
     expect(render(entries[0].component)).toContain('saved@example.com')
   })
 

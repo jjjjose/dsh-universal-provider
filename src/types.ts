@@ -1,3 +1,11 @@
+export interface ModelView {
+  provider: string
+  id: string
+  name: string
+  description?: string
+  inputModalities?: readonly ('text' | 'image')[]
+}
+
 export interface PingResult {
   readonly message: string
   readonly timestamp: number
