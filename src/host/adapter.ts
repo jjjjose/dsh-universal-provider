@@ -1,38 +1,32 @@
 import type { ServerSupervisor } from './server.ts'
-import type { CLIProxyClient, ProxyRequestBody } from '../core/api/proxy-client.ts'
+import type { ProxyRequestBody } from '../core/api/proxy-client.ts'
 import { matchCatalogModel } from '../core/models/catalog-match.ts'
 import { fetchCatalog, type ModelCatalogs } from '../core/models/catalog.ts'
 import { ProxyHttpError } from '../core/api/errors.ts'
 import type { ModelView } from '../types.ts'
+import { LlmAdapter, LlmError, type LlmModelInfo, type LlmResolvedModelInfo, type GenerateOptions, type ReasoningEffortId } from '@deepseek-ai/dsh-llm'
 
-export interface ModelInfo extends ModelView {}
+export interface ModelInfo extends ModelView, LlmModelInfo {}
 
-export interface ResolvedModelInfo extends ModelInfo {
-  context?: { contextWindow: number }
-  defaultMaxTokens?: number
-  reasoning?: {
-    efforts: readonly { id: string; name: string; description?: string }[]
-    defaultEffort?: string
-  }
-}
-
-export class UniversalLlmAdapter {
+export class UniversalLlmAdapter extends LlmAdapter {
   private catalogs?: ModelCatalogs
+  private publishedCatalog = ''
+  onModelsChanged: (() => void) | undefined
 
-  constructor(private readonly supervisor: ServerSupervisor) {}
+  constructor(private readonly supervisor: ServerSupervisor) { super() }
 
-  providerInfo(provider: string) {
+  override providerInfo(provider: string) {
     return {
       id: provider,
       name: 'Universal Provider',
     }
   }
 
-  providerRetryPolicy(_provider: string) {
+  override providerRetryPolicy(_provider: string) {
     return undefined
   }
 
-  imageRequestPricing(_provider: string, _model: string) {
+  override imageRequestPricing(_provider: string, _model: string) {
     return undefined
   }
 
@@ -40,7 +34,7 @@ export class UniversalLlmAdapter {
     return []
   }
 
-  async listModels(provider: string, signal?: AbortSignal): Promise<readonly ModelInfo[]> {
+  override async listModels(provider: string, signal?: AbortSignal): Promise<readonly ModelInfo[]> {
     signal?.throwIfAborted()
     await this.supervisor.ensureRunning(signal)
     const client = this.supervisor.getProxyClient()
@@ -56,7 +50,7 @@ export class UniversalLlmAdapter {
     }
     signal?.throwIfAborted()
 
-    return discovery.available.map((entry) => {
+    const models = discovery.available.map((entry) => {
       const metadata = discovery.metadata.find(m => m.slug === entry.id)
       const catalogMatch = this.catalogs ? matchCatalogModel(entry.id, this.catalogs.router) : undefined
 
@@ -75,39 +69,47 @@ export class UniversalLlmAdapter {
         inputModalities: modalities,
       }
     })
+    const fingerprint = JSON.stringify({ models, metadata: discovery.metadata })
+    if (fingerprint !== this.publishedCatalog) {
+      this.publishedCatalog = fingerprint
+      this.onModelsChanged?.()
+    }
+    return models
   }
 
-  async resolveModel(provider: string, model: string, signal?: AbortSignal): Promise<ResolvedModelInfo> {
+  override async resolveModel(provider: string, model: string, signal?: AbortSignal): Promise<LlmResolvedModelInfo> {
     let contextWindow = 128000
     let maxOutputTokens = 4096
     let modalities: ('text' | 'image')[] = ['text']
-    let reasoningEfforts: { id: string; name: string }[] | undefined
+    let reasoningEfforts: { id: ReasoningEffortId; name: string }[] | undefined
+    let defaultEffort: ReasoningEffortId | undefined
 
-    try {
-      await this.supervisor.ensureRunning(signal)
-      const client = this.supervisor.getProxyClient()
+    signal?.throwIfAborted()
+    await this.supervisor.ensureRunning(signal)
+    const client = this.supervisor.getProxyClient()
+    if (!client) throw new LlmError('CLIProxyAPI client unavailable', 'PROVIDER_UNAVAILABLE')
 
-      if (client) {
-        const discovery = await client.discover(signal)
-        const metadata = discovery.metadata.find(m => m.slug === model)
-        const entry = discovery.available.find(m => m.id === model)
+    const discovery = await client.discover(signal)
+    const metadata = discovery.metadata.find(m => m.slug === model)
+    const entry = discovery.available.find(m => m.id === model)
+    if (!entry) throw new LlmError(`El modelo ${model} ya no está disponible. Actualiza el catálogo.`, 'MODEL_UNAVAILABLE')
 
-        if (entry?.context_length) contextWindow = entry.context_length
-        if (metadata?.context_window) contextWindow = metadata.context_window
-        if (entry?.max_completion_tokens) maxOutputTokens = entry.max_completion_tokens
+    if (entry.context_length) contextWindow = entry.context_length
+    if (metadata?.context_window) contextWindow = metadata.context_window
+    if (entry.max_completion_tokens) maxOutputTokens = entry.max_completion_tokens
 
-        if (metadata?.supported_reasoning_levels && metadata.supported_reasoning_levels.length > 0) {
-          reasoningEfforts = metadata.supported_reasoning_levels.map(l => ({
-            id: l.effort,
-            name: l.effort.charAt(0).toUpperCase() + l.effort.slice(1),
-          }))
-        }
-
-        if (metadata?.input_modalities?.includes('image')) {
-          modalities.push('image')
-        }
+    if (metadata?.supported_reasoning_levels?.length) {
+      reasoningEfforts = [...new Set(metadata.supported_reasoning_levels.map(l => l.effort).filter(Boolean))].map(effort => ({
+        id: effort as ReasoningEffortId,
+        name: effort.charAt(0).toUpperCase() + effort.slice(1),
+      }))
+      if (reasoningEfforts.some(e => e.id === metadata.default_reasoning_level)) {
+        defaultEffort = metadata.default_reasoning_level as ReasoningEffortId
       }
-    } catch {}
+    }
+
+    if (metadata?.input_modalities?.includes('image')) modalities.push('image')
+    signal?.throwIfAborted()
 
     return {
       provider,
@@ -116,51 +118,29 @@ export class UniversalLlmAdapter {
       inputModalities: modalities,
       context: { contextWindow },
       defaultMaxTokens: maxOutputTokens,
-      ...(reasoningEfforts ? {
+      ...(reasoningEfforts?.length ? {
         reasoning: {
           efforts: reasoningEfforts,
-          ...(reasoningEfforts[0] !== undefined ? { defaultEffort: reasoningEfforts[0].id } : {}),
+          ...(defaultEffort !== undefined ? { defaultEffort } : {}),
         },
       } : {}),
     }
   }
 
-  async prepareCall(provider: string, model: string, signal?: AbortSignal) {
+  override async prepareCall(provider: string, model: string, signal?: AbortSignal) {
     const resolved = await this.resolveModel(provider, model, signal)
     return {
       model: resolved,
-      stream: (options: any) => this.stream(options),
+      stream: (options: GenerateOptions) => this.stream(options),
     }
   }
 
   async *stream(options: any): AsyncIterable<any> {
     const release = await this.supervisor.acquireRequest()
     try {
-      let client: CLIProxyClient | undefined
-      try {
-        await this.supervisor.ensureRunning(options.signal)
-        client = this.supervisor.getProxyClient()
-      } catch (e: any) {
-        // Safe mock fallback when server is not configured yet
-        yield { type: 'block-start', index: 0, blockType: 'text' }
-        yield {
-          type: 'text-delta',
-          index: 0,
-          text: `[Universal Provider] Servidor CLIProxyAPI en preparación o no disponible (${e?.message || 'sin iniciar'}). Abre Settings -> Universal Provider para configurar una cuenta OAuth o endpoint.`,
-        }
-        yield {
-          type: 'block-end',
-          index: 0,
-          block: {
-            type: 'text',
-            text: `[Universal Provider] Servidor CLIProxyAPI en preparación o no disponible (${e?.message || 'sin iniciar'}). Abre Settings -> Universal Provider para configurar una cuenta OAuth o endpoint.`,
-          },
-        }
-        yield { type: 'finish', reason: { kind: 'stop' } }
-        return
-      }
-
-      if (!client) throw new Error('CLIProxyAPI client unavailable')
+      await this.supervisor.ensureRunning(options.signal)
+      const client = this.supervisor.getProxyClient()
+      if (!client) throw new LlmError('CLIProxyAPI client unavailable', 'PROVIDER_UNAVAILABLE')
 
       const body = this.buildRequestBody(options)
 

@@ -36,6 +36,7 @@ export default defineConfig([
     dts: true,
     clean: false,
     plugins: [decoratorLoweringPlugin],
+    deps: { neverBundle: [/^@deepseek-ai\//] },
   },
   {
     entry: { client: 'src/client/index.ts' },

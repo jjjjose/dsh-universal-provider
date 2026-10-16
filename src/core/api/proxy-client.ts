@@ -1,3 +1,4 @@
+import { attributionHeaders } from '@deepseek-ai/dsh-llm'
 import type { BeforeErrorHook, KyInstance } from 'ky'
 import { Type } from '@sinclair/typebox'
 import { isHTTPError } from 'ky'
@@ -85,6 +86,7 @@ export class CLIProxyClient {
     this.fetcher = kyFetch.extend({
       prefix: baseUrl,
       headers: {
+        ...attributionHeaders(),
         'Authorization': `Bearer ${apiKey}`,
         'Content-Type': 'application/json',
       },

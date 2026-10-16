@@ -17,6 +17,7 @@ import { resolveProviderPaths, type ProviderPaths } from './host/paths.ts'
 import { Config, type ProviderConfig } from './host/config.ts'
 import { ServerSupervisor } from './host/server.ts'
 import { UniversalLlmAdapter } from './host/adapter.ts'
+import type { LlmRuntime } from '@deepseek-ai/dsh-llm'
 import {
   generateCommitDraft,
   configureAuxiliaryTitles,
@@ -83,6 +84,15 @@ export class UniversalProviderService extends TypertRemoteService {
     return this.adapter.listModels('universal-chat-provider', signal)
   }
 
+  private async refreshModels(signal?: AbortSignal): Promise<void> {
+    try {
+      await this.listModels(signal)
+    } catch (error) {
+      signal?.throwIfAborted()
+      this.ctx.logger.warn('Universal Provider: no se pudo actualizar el catálogo de modelos', error)
+    }
+  }
+
   @Remote
   async listAccounts(signal?: AbortSignal): Promise<AccountView[]> {
     signal?.throwIfAborted()
@@ -117,7 +127,9 @@ export class UniversalProviderService extends TypertRemoteService {
     const mgmt = this.supervisor.getManagementClient()
     if (!mgmt) throw new Error('Management client unavailable')
 
-    return await mgmt.getAuthStatus(state, signal)
+    const result = await mgmt.getAuthStatus(state, signal)
+    if (result.status === 'ok') await this.refreshModels(signal)
+    return result
   }
 
   @Remote
@@ -139,6 +151,7 @@ export class UniversalProviderService extends TypertRemoteService {
     if (!mgmt) throw new Error('Management client unavailable')
 
     await mgmt.deleteAuthFile(name, signal)
+    await this.refreshModels(signal)
     return true
   }
 
@@ -191,6 +204,7 @@ export class UniversalProviderService extends TypertRemoteService {
     }
 
     await mgmt.putOpenAICompatibility(current, signal)
+    await this.refreshModels(signal)
     return true
   }
 
@@ -267,9 +281,11 @@ export function apply(ctx: Context, config: ProviderConfig) {
   const adapter = new UniversalLlmAdapter(supervisor)
   new UniversalProviderService(ctx, supervisor, paths, config, adapter)
 
-  const llm = (ctx as any).llm
+  const llm: LlmRuntime = ctx.llm
   if (llm) {
-    llm.registerAdapter(['universal-chat-provider'], adapter)
+    const registration = llm.registerAdapter(['universal-chat-provider'], adapter)
+    adapter.onModelsChanged = () => registration.replace(['universal-chat-provider'])
+    ctx.effect(() => () => { adapter.onModelsChanged = undefined })
     llm.registerConfigurableProviders([{
       provider: 'universal-chat-provider',
       displayName: 'Universal Provider',
