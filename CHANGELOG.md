@@ -8,6 +8,19 @@ El formato se basa en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/
 
 ## [Unreleased]
 
+## [0.30.5] - 2026-10-15
+
+### Añadido
+- **Descubrimiento de modelos vía RPC propio:** Nueva interfaz `ModelView` (`provider`, `id`, `name`, `description`, `inputModalities`) y método remoto `listModels` en `UniversalProviderService`, de modo que la consulta de modelos ya no depende del espacio de nombres `remote.llm` del host.
+- **Sección "Modelos disponibles":** El panel muestra la lista de modelos descubiertos con botón *Actualizar modelos*, estado de carga y aviso cuando no hay modelos para las cuentas y endpoints configurados.
+
+### Cambiado
+- **Adaptador LLM:** `UniversalLlmAdapter` reutiliza `ModelView` para la información de modelos y expone `listModels` con soporte de `AbortSignal`; se elimina el respaldo `universal-chat` y el caché de descubrimientos previos.
+- **Instancia única del adaptador:** El adaptador se crea una sola vez en `apply` y se comparte entre el servicio y `ctx.llm.registerAdapter`.
+
+### Corregido
+- **Refresco de modelos:** La lista se actualiza al abrir el panel, al cambiar de pestaña (cuentas y endpoints) y tras añadir o eliminar cuentas y endpoints, en lugar de quedarse desactualizada.
+
 ## [0.30.4] - 2026-10-15
 
 ### Corregido
