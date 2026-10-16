@@ -11,6 +11,7 @@ declare module '@deepseek-ai/dsh-typert-protocol' {
 }
 
 export interface UniversalProviderRemote {
+  setModelContext(options: { model: string; contextWindow: number }, signal?: AbortSignal): Promise<boolean>;
   listModels(signal?: AbortSignal): Promise<readonly ModelView[]>;
   ping(signal?: AbortSignal): Promise<PingResult>;
   getState(signal?: AbortSignal): Promise<ProviderStatus>;

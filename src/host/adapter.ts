@@ -1,4 +1,5 @@
 import type { ServerSupervisor } from './server.ts'
+import { DEFAULT_MODEL_CONTEXT, ModelContextSettings } from './model-context.ts'
 import { normalizeUsage } from './usage.ts'
 import type { ProxyRequestBody } from '../core/api/proxy-client.ts'
 import { matchCatalogModel } from '../core/models/catalog-match.ts'
@@ -14,7 +15,12 @@ export class UniversalLlmAdapter extends LlmAdapter {
   private publishedCatalog = ''
   onModelsChanged: (() => void) | undefined
 
-  constructor(private readonly supervisor: ServerSupervisor) { super() }
+  constructor(private readonly supervisor: ServerSupervisor, readonly contextSettings = new ModelContextSettings()) { super() }
+
+  async setModelContext(model: string, contextWindow: number): Promise<void> {
+    await this.contextSettings.set(model, contextWindow)
+    this.onModelsChanged?.()
+  }
 
   override providerInfo(provider: string) {
     return {
@@ -51,6 +57,7 @@ export class UniversalLlmAdapter extends LlmAdapter {
     }
     signal?.throwIfAborted()
 
+    const contexts = await this.contextSettings.all()
     const models = discovery.available.map((entry) => {
       const metadata = discovery.metadata.find(m => m.slug === entry.id)
       const catalogMatch = this.catalogs ? matchCatalogModel(entry.id, this.catalogs.router) : undefined
@@ -65,6 +72,7 @@ export class UniversalLlmAdapter extends LlmAdapter {
       return {
         provider,
         id: entry.id,
+        contextWindow: Object.hasOwn(contexts, entry.id) ? contexts[entry.id]! : DEFAULT_MODEL_CONTEXT,
         name,
         ...(description !== undefined ? { description } : {}),
         inputModalities: modalities,
@@ -79,7 +87,6 @@ export class UniversalLlmAdapter extends LlmAdapter {
   }
 
   override async resolveModel(provider: string, model: string, signal?: AbortSignal): Promise<LlmResolvedModelInfo> {
-    let contextWindow = 128000
     let maxOutputTokens = 4096
     let modalities: ('text' | 'image')[] = ['text']
     let reasoningEfforts: { id: ReasoningEffortId; name: string }[] | undefined
@@ -95,8 +102,7 @@ export class UniversalLlmAdapter extends LlmAdapter {
     const entry = discovery.available.find(m => m.id === model)
     if (!entry) throw new LlmError(`El modelo ${model} ya no está disponible. Actualiza el catálogo.`, 'MODEL_UNAVAILABLE')
 
-    if (entry.context_length) contextWindow = entry.context_length
-    if (metadata?.context_window) contextWindow = metadata.context_window
+    const contextWindow = await this.contextSettings.get(model)
     if (entry.max_completion_tokens) maxOutputTokens = entry.max_completion_tokens
 
     if (metadata?.supported_reasoning_levels?.length) {

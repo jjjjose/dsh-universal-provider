@@ -24,6 +24,7 @@ const CatalogModelSchema = Type.Object({
   description: Type.Optional(Type.String()),
   version: Type.Optional(Type.String()),
   context_length: Type.Optional(Type.Number()),
+  context_window: Type.Optional(Type.Number()),
   max_completion_tokens: Type.Optional(Type.Number()),
   inputTokenLimit: Type.Optional(Type.Number()),
   outputTokenLimit: Type.Optional(Type.Number()),
@@ -171,6 +172,7 @@ function toCatalogModel(model: ModelsDevModel): CatalogModel {
       : output < model.limit.context ? model.limit.context - output : model.limit.context)
   return {
     id: model.id,
+    ...(model.limit?.context === undefined ? {} : { context_window: model.limit.context }),
     ...(model.name === undefined ? {} : { display_name: model.name }),
     ...(model.description === undefined ? {} : { description: model.description }),
     ...(input === undefined ? {} : { context_length: input }),

@@ -52,6 +52,23 @@ function registerSettings(ctx: ClientContext, mountError: string | null = null) 
         const oauthFlow = useState(() => ({ controller: null as AbortController | null, mounted: true }))[0]
         const [availableModels, setAvailableModels] = useState<any[]>([])
         const [modelsStatus, setModelsStatus] = useState('idle')
+        const [contextDrafts, setContextDrafts] = useState<Record<string, string>>({})
+        const [savingContext, setSavingContext] = useState<string | null>(null)
+        const contextPresets = [100000, 128000, 200000, 272000, 500000, 1000000, 2000000]
+
+        const saveModelContext = async (model: string, contextWindow: number) => {
+          if (!remote) return
+          setSavingContext(model)
+          setError(null)
+          try {
+            await expectRemote(remote.setModelContext({ model, contextWindow }))
+            setAvailableModels(previous => previous.map(item => item.id === model ? { ...item, contextWindow } : item))
+          } catch (e: any) {
+            setError(e?.message || 'No se pudo guardar el contexto.')
+          } finally {
+            setSavingContext(null)
+          }
+        }
 
         // Form state for OpenAI endpoints
         const [newEndpointName, setNewEndpointName] = useState('')
@@ -360,7 +377,46 @@ function registerSettings(ctx: ClientContext, mountError: string | null = null) 
             h('h3', null, 'Modelos disponibles'),
             h('button', { type: 'button', disabled: modelsStatus === 'loading', onClick: refreshModelList }, modelsStatus === 'loading' ? 'Consultando modelos…' : 'Actualizar modelos'),
             modelsStatus === 'ready' && !availableModels.length ? h('p', null, 'No hay modelos disponibles para las cuentas y endpoints configurados.') : null,
-            modelsStatus === 'ready' ? h('ul', null, availableModels.map(model => h('li', { key: `${model.provider}/${model.id}` }, `${model.name} (${model.id})`))) : null,
+            h('p', null, 'Contexto por modelo: 1M de tokens por defecto. Los cambios se guardan y se comunican al Harness.'),
+            modelsStatus === 'ready' ? h('ul', null, availableModels.map(model => {
+              const current = model.contextWindow ?? 1000000
+              const custom = Object.hasOwn(contextDrafts, model.id) || !contextPresets.includes(current)
+              const draft = contextDrafts[model.id] ?? String(current)
+              return h('li', { key: `${model.provider}/${model.id}`, style: { marginBottom: '12px' } }, [
+                h('span', null, `${model.name} (${model.id}) `),
+                h('select', {
+                  'aria-label': `Contexto de ${model.id}`,
+                  value: custom ? 'custom' : String(current),
+                  disabled: savingContext !== null,
+                  onChange: (event: any) => {
+                    const value = event.target.value
+                    if (value === 'custom') {
+                      setContextDrafts(previous => ({ ...previous, [model.id]: String(current) }))
+                    } else {
+                      setContextDrafts(previous => {
+                        const next = { ...previous }
+                        delete next[model.id]
+                        return next
+                      })
+                      void saveModelContext(model.id, Number(value))
+                    }
+                  },
+                }, [
+                  ...contextPresets.map(value => h('option', { key: value, value: String(value) }, value >= 1000000 ? `${value / 1000000}M` : `${value / 1000}k`)),
+                  h('option', { value: 'custom' }, 'Personalizado'),
+                ]),
+                custom ? h('input', {
+                  type: 'number', min: 1, step: 1, value: draft,
+                  'aria-label': `Tokens de contexto de ${model.id}`,
+                  onChange: (event: any) => setContextDrafts(previous => ({ ...previous, [model.id]: event.target.value })),
+                }) : null,
+                custom ? h('button', {
+                  type: 'button', disabled: savingContext !== null || !Number.isSafeInteger(Number(draft)) || Number(draft) <= 0,
+                  onClick: () => void saveModelContext(model.id, Number(draft)),
+                }, 'Guardar contexto') : null,
+                h('span', null, savingContext === model.id ? ' Guardando…' : ` Activo: ${current.toLocaleString()} tokens`),
+              ])
+            })) : null,
           ]) : null,
 
           // Tab: OAuth Accounts

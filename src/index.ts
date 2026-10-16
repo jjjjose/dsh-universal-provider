@@ -2,6 +2,8 @@ import { Context } from '@deepseek-ai/cordis'
 import { Remote, TypertRemoteService } from '@deepseek-ai/dsh-typert-protocol'
 import { readFile } from 'node:fs/promises'
 import { existsSync } from 'node:fs'
+import { join } from 'node:path'
+import { ModelContextSettings } from './host/model-context.ts'
 import type {
   PingResult,
   ModelView,
@@ -41,7 +43,7 @@ export class UniversalProviderService extends TypertRemoteService {
     private readonly supervisor: ServerSupervisor,
     private readonly paths: ProviderPaths,
     private readonly config: ProviderConfig,
-    private readonly adapter = new UniversalLlmAdapter(supervisor),
+    private readonly adapter = new UniversalLlmAdapter(supervisor, new ModelContextSettings(join(paths.profileRoot, 'model-contexts.json'))),
   ) {
     super(ctx, 'universalProvider')
   }
@@ -91,6 +93,13 @@ export class UniversalProviderService extends TypertRemoteService {
       signal?.throwIfAborted()
       this.ctx.logger.warn('Universal Provider: no se pudo actualizar el catálogo de modelos', error)
     }
+  }
+
+  @Remote
+  async setModelContext(options: { model: string; contextWindow: number }, signal?: AbortSignal): Promise<boolean> {
+    signal?.throwIfAborted()
+    await this.adapter.setModelContext(options.model, options.contextWindow)
+    return true
   }
 
   @Remote
@@ -279,7 +288,7 @@ export function apply(ctx: Context, config: ProviderConfig) {
   const paths = resolveProviderPaths(profileId)
   const supervisor = new ServerSupervisor(ctx, paths, config)
 
-  const adapter = new UniversalLlmAdapter(supervisor)
+  const adapter = new UniversalLlmAdapter(supervisor, new ModelContextSettings(join(paths.profileRoot, 'model-contexts.json')))
   new UniversalProviderService(ctx, supervisor, paths, config, adapter)
 
   const llm: LlmRuntime = ctx.llm

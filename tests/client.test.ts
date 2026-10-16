@@ -69,6 +69,7 @@ function context(client: any, mount = vi.fn().mockResolvedValue(undefined)) {
   // DSH's Typert gateway always resolves remote invocations wrapped in a
   // RemoteResult envelope, so the mock models that contract.
   const api = {
+    setModelContext: vi.fn().mockResolvedValue({ ok: true, value: true }),
     getState: vi.fn().mockResolvedValue({ ok: true, value: { status: 'ready' } }),
     listAccounts: vi.fn().mockResolvedValue({ ok: true, value: [{ name: 'saved-account', email: 'saved@example.com' }] }),
     listModels: vi.fn().mockResolvedValue({ ok: true, value: [{ provider: 'universal-chat-provider', id: 'test-model', name: 'Test model' }] }),
@@ -112,6 +113,32 @@ function context(client: any, mount = vi.fn().mockResolvedValue(undefined)) {
 }
 
 describe('DSH client configuration entry', () => {
+  it('defaults to 1M and saves preset and custom model contexts', async () => {
+    const { client, render, renderTree } = loadClient()
+    const { ctx, entries, api } = context(client)
+    await client.apply(ctx)
+    const component = entries[0]!.component
+    const find = (node: any, predicate: (node: any) => boolean): any => {
+      if (!node || typeof node !== 'object') return
+      if (predicate(node)) return node
+      for (const child of Array.isArray(node) ? node : node.children ?? []) {
+        const match = find(child, predicate)
+        if (match) return match
+      }
+    }
+    render(component)
+    await vi.waitFor(() => expect(render(component)).toContain('Contexto de test-model'))
+    const select = () => find(renderTree(component), n => n.props?.['aria-label'] === 'Contexto de test-model')
+    expect(select().props.value).toBe('1000000')
+    select().props.onChange({ target: { value: '500000' } })
+    await vi.waitFor(() => expect(select().props.value).toBe('500000'))
+    expect(api.setModelContext).toHaveBeenLastCalledWith({ model: 'test-model', contextWindow: 500000 })
+    select().props.onChange({ target: { value: 'custom' } })
+    find(renderTree(component), n => n.props?.['aria-label'] === 'Tokens de contexto de test-model').props.onChange({ target: { value: '1500000' } })
+    find(renderTree(component), n => n.type === 'button' && n.children?.includes('Guardar contexto')).props.onClick()
+    await vi.waitFor(() => expect(api.setModelContext).toHaveBeenLastCalledWith({ model: 'test-model', contextWindow: 1500000 }))
+  })
+
   it('shows Google model quotas alongside GPT and reports empty and failed accounts', async () => {
     const { client, renderTree, render } = loadClient()
     const { ctx, entries, api } = context(client)

@@ -3,6 +3,7 @@ interface ModelView {
   provider: string;
   id: string;
   name: string;
+  contextWindow?: number;
   description?: string;
   inputModalities?: readonly ('text' | 'image')[];
 }

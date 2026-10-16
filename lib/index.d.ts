@@ -206,14 +206,27 @@ declare class ServerSupervisor {
   dispose(): Promise<void>;
 }
 //#endregion
+//#region src/host/model-context.d.ts
+declare class ModelContextSettings {
+  private readonly path?;
+  private pending;
+  constructor(path?: string | undefined);
+  private read;
+  all(): Promise<Record<string, number>>;
+  get(model: string): Promise<number>;
+  set(model: string, contextWindow: number): Promise<void>;
+}
+//#endregion
 //#region src/host/adapter.d.ts
 interface ModelInfo extends ModelView, LlmModelInfo {}
 declare class UniversalLlmAdapter extends LlmAdapter {
   private readonly supervisor;
+  readonly contextSettings: ModelContextSettings;
   private catalogs?;
   private publishedCatalog;
   onModelsChanged: (() => void) | undefined;
-  constructor(supervisor: ServerSupervisor);
+  constructor(supervisor: ServerSupervisor, contextSettings?: ModelContextSettings);
+  setModelContext(model: string, contextWindow: number): Promise<void>;
   providerInfo(provider: string): {
     id: string;
     name: string;
@@ -247,6 +260,10 @@ declare class UniversalProviderService extends TypertRemoteService {
   getState(signal?: AbortSignal): Promise<ProviderStatus>;
   listModels(signal?: AbortSignal): Promise<readonly ModelView[]>;
   private refreshModels;
+  setModelContext(options: {
+    model: string;
+    contextWindow: number;
+  }, signal?: AbortSignal): Promise<boolean>;
   listAccounts(signal?: AbortSignal): Promise<AccountView[]>;
   startOAuth(provider: string, signal?: AbortSignal): Promise<OAuthStartResult>;
   pollOAuth(state: string, signal?: AbortSignal): Promise<OAuthPollResult>;

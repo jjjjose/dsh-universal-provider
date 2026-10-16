@@ -74,9 +74,10 @@ describe('Universal Provider End-to-End Plugin Integration', () => {
     const models = await llm.listModels('universal-chat-provider')
     expect(models.length).toBeGreaterThan(0)
     expect(models.map((model: any) => model.id)).toEqual(['gemini-test', 'gpt-test', 'claude-test'])
-    expect(await ctx.universalProvider.listModels()).toEqual(models)
+    expect(await ctx.universalProvider.listModels()).toEqual(models.map(model => ({ ...model, contextWindow: 1000000 })))
     expect(updated).toHaveBeenCalledOnce()
     const info = await llm.resolveModelInfo('universal-chat-provider', 'gpt-test')
+    expect(info.context?.contextWindow).toBe(1000000)
     expect(info.reasoning).toEqual({ efforts: [{ id: 'off', name: 'Off' }, { id: 'high', name: 'High' }], defaultEffort: 'high' })
     await expect(llm.resolveCallConfig({ provider: 'universal-chat-provider', model: 'gpt-test', reasoningEffort: 'invalid' as ReasoningEffortId })).rejects.toMatchObject({ code: 'UNSUPPORTED_REASONING_EFFORT' })
 

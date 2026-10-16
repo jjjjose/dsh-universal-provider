@@ -33,6 +33,7 @@ export const getModelsListSchema = () => (_modelsListSchema ??= z.array(z.object
   name: z.string(),
   description: z.string().optional(),
   inputModalities: z.array(z.enum(['text', 'image'])).readonly().optional(),
+  contextWindow: z.number().optional(),
 })).readonly())
 
 let _accountViewSchema
@@ -111,6 +112,7 @@ export const getCommitDraftResultSchema = () => (_commitDraftResultSchema ??= z.
 }))
 
 let _stringSchema
+export const getModelContextSchema = () => z.object({ model: z.string().min(1), contextWindow: z.number().int().positive().max(Number.MAX_SAFE_INTEGER) })
 export const getStringSchema = () => (_stringSchema ??= z.string())
 
 let _booleanSchema
@@ -121,6 +123,19 @@ export const getLogsListSchema = () => (_logsListSchema ??= z.array(z.string()))
 `
 
 const invocationsCode = `[
+    {
+      id: 'universal-provider#universalProvider/setModelContext',
+      service: 'universalProvider',
+      namespace: 'universalProvider',
+      method: 'setModelContext',
+      invocation: { kind: 'direct' },
+      parameters: [{ name: 'options', wire: 'options', source: 'json', codec: {
+        mode: 'strict', typeSymbol: 'universal-provider/types#ModelContextOptions', create: getModelContextSchema,
+      } }],
+      cancellation: { parameter: 'signal' },
+      result: { mode: 'strict', typeSymbol: 'universal-provider/types#boolean', create: getBooleanSchema },
+      sourceLocation: { file: 'src/index.ts', line: 100, column: 3 },
+    },
     {
       id: 'universal-provider#universalProvider/listModels',
       service: 'universalProvider',
@@ -451,6 +466,7 @@ export const TYPERT = {
         key: 'universalProvider',
         exportName: 'UniversalProviderService',
         members: [
+          { kind: 'method', name: 'setModelContext', signature: '@Remote async setModelContext(options: { model: string; contextWindow: number }, signal?: AbortSignal): Promise<boolean>' },
           { kind: 'method', name: 'listModels', signature: '@Remote async listModels(signal?: AbortSignal): Promise<readonly ModelView[]>' },
           { kind: 'method', name: 'ping', signature: '@Remote async ping(signal?: AbortSignal): Promise<PingResult>' },
           { kind: 'method', name: 'getState', signature: '@Remote async getState(signal?: AbortSignal): Promise<ProviderStatus>' },
@@ -468,7 +484,7 @@ export const TYPERT = {
           { kind: 'method', name: 'configureCompaction', signature: '@Remote async configureCompaction(model: string, signal?: AbortSignal): Promise<boolean>' },
         ],
         types: [
-          { name: 'ModelView', declaration: 'export interface ModelView { provider: string; id: string; name: string; description?: string; inputModalities?: readonly ("text" | "image")[]; }' },
+          { name: 'ModelView', declaration: 'export interface ModelView { provider: string; id: string; name: string; contextWindow?: number; description?: string; inputModalities?: readonly ("text" | "image")[]; }' },
           { name: 'PingResult', declaration: 'export interface PingResult { readonly message: string; readonly timestamp: number; }' },
           { name: 'ProviderStatus', declaration: 'export interface ProviderStatus { readonly status: string; readonly version: string; readonly mode: "managed" | "external"; readonly port?: number; readonly activeRequests: number; readonly baseUrl: string; }' },
           { name: 'AccountView', declaration: 'export interface AccountView { readonly name: string; readonly type?: string; readonly provider?: string; readonly email?: string; readonly label?: string; }' },
@@ -514,6 +530,7 @@ declare module '@deepseek-ai/dsh-typert-protocol' {
 }
 
 export interface UniversalProviderRemote {
+  setModelContext(options: { model: string; contextWindow: number }, signal?: AbortSignal): Promise<boolean>;
   listModels(signal?: AbortSignal): Promise<readonly ModelView[]>;
   ping(signal?: AbortSignal): Promise<PingResult>;
   getState(signal?: AbortSignal): Promise<ProviderStatus>;

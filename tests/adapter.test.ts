@@ -1,10 +1,28 @@
 import { describe, expect, it, vi } from 'vitest'
 import { UniversalLlmAdapter } from '../src/host/adapter.ts'
 import { AssistantStreamAccumulator } from '@deepseek-ai/dsh-llm'
+import { mkdtemp, rm } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import { ModelContextSettings } from '../src/host/model-context.ts'
 
-vi.mock('../src/core/models/catalog.ts', () => ({ fetchCatalog: async () => { throw new Error('offline') } }))
+vi.mock('../src/core/models/catalog.ts', () => ({ fetchCatalog: vi.fn(async () => { throw new Error('offline') }) }))
 
 describe('UniversalLlmAdapter', () => {
+  it('defaults to 1M even when discovery reports a smaller window', async () => {
+    const adapter = new UniversalLlmAdapter({
+      ensureRunning: async () => {},
+      getProxyClient: () => ({
+        discover: async () => ({
+          available: [{ id: 'test-model', owned_by: 'test-provider', context_length: 272000 }],
+          metadata: [{ slug: 'test-model', context_window: 272000 }],
+        }),
+      }),
+    } as any)
+    const resolved = await adapter.resolveModel('universal-chat-provider', 'test-model')
+    expect(resolved.context?.contextWindow).toBe(1000000)
+  })
+
   it('discovers all providers and removes models when their accounts disappear', async () => {
     const discover = vi.fn().mockResolvedValue({
       available: ['gemini-test', 'gpt-test', 'claude-test', 'endpoint-model'].map(id => ({ id })),
@@ -111,8 +129,33 @@ describe('UniversalLlmAdapter', () => {
     const model = await adapter.resolveModel('universal-chat-provider', 'claude-3-7-sonnet')
 
     expect(model.id).toBe('claude-3-7-sonnet')
-    expect(model.context?.contextWindow).toBe(200000)
+    expect(model.context?.contextWindow).toBe(1000000)
     expect(model.defaultMaxTokens).toBe(8192)
     expect(model.reasoning?.efforts[0]?.id).toBe('high')
+  })
+
+  it('persists per-model choices, invalidates Harness and uses the chosen value in listings and calls', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'model-context-'))
+    try {
+      const path = join(root, 'contexts.json')
+      const adapter = new UniversalLlmAdapter(mockSupervisor, new ModelContextSettings(path))
+      adapter.onModelsChanged = vi.fn()
+      await adapter.setModelContext('claude-3-7-sonnet', 500000)
+      expect(adapter.onModelsChanged).toHaveBeenCalledOnce()
+      expect((await adapter.listModels('universal-chat-provider'))[0]?.contextWindow).toBe(500000)
+      const restarted = new UniversalLlmAdapter(mockSupervisor, new ModelContextSettings(path))
+      expect((await restarted.prepareCall('universal-chat-provider', 'claude-3-7-sonnet')).model.context?.contextWindow).toBe(500000)
+      expect(await restarted.contextSettings.get('other-model')).toBe(1000000)
+      await expect(restarted.setModelContext('claude-3-7-sonnet', -1)).rejects.toThrow('entero positivo')
+      expect(await restarted.contextSettings.get('claude-3-7-sonnet')).toBe(500000)
+      await Promise.all([
+        restarted.setModelContext('first', 200000),
+        restarted.setModelContext('second', 2000000),
+      ])
+      expect(await restarted.contextSettings.get('first')).toBe(200000)
+      expect(await restarted.contextSettings.get('second')).toBe(2000000)
+    } finally {
+      await rm(root, { recursive: true, force: true })
+    }
   })
 })

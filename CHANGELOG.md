@@ -8,6 +8,20 @@ El formato se basa en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/
 
 ## [Unreleased]
 
+## [0.32.0] - 2026-10-16
+
+### Añadido
+- **Contexto por modelo configurable:** Nuevo almacén persistente `ModelContextSettings` (`model-contexts.json` bajo el perfil, con escrituras atómicas y serializadas) y **1 000 000 de tokens por defecto**. Valida que el valor sea un entero positivo.
+- **RPC `setModelContext`:** El servicio expone `setModelContext({ model, contextWindow })` → `boolean` y el contrato Typert lo declara con el esquema estricto `ModelContextOptions`.
+- **Editor de contexto en el panel:** Selector por modelo con presets (100k, 128k, 200k, 272k, 500k, 1M, 2M) y valor personalizado, con estado de guardado y refresco del catálogo al cambiar el valor.
+- **`contextWindow` en `ModelView`:** `listModels` publica el contexto efectivo de cada modelo y el catálogo toma `context_window` de `limit.context` de models.dev.
+
+### Cambiado
+- **Resolución de contexto:** `resolveModel` usa el valor configurado del modelo (por defecto 1M) en lugar de inferirlo de `entry.context_length`/`metadata.context_window`.
+
+### Corregido
+- **Ventana por defecto:** Un `context_length` descubierto menor ya no reduce el contexto efectivo a 128k; el respaldo pasa a ser 1M salvo que se configure otro valor.
+
 ## [0.31.1] - 2026-10-15
 
 ### Añadido
