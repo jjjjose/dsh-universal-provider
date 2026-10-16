@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import { UniversalLlmAdapter } from '../src/host/adapter.ts'
+import { AssistantStreamAccumulator } from '@deepseek-ai/dsh-llm'
 
 vi.mock('../src/core/models/catalog.ts', () => ({ fetchCatalog: async () => { throw new Error('offline') } }))
 
@@ -78,6 +79,7 @@ describe('UniversalLlmAdapter', () => {
   it('streams chunks with balanced blocks, reasoning, tools, and usage', async () => {
     const adapter = new UniversalLlmAdapter(mockSupervisor)
     const chunks: any[] = []
+    const accumulator = new AssistantStreamAccumulator()
 
     for await (const chunk of adapter.stream({
       provider: 'universal-chat-provider',
@@ -85,6 +87,7 @@ describe('UniversalLlmAdapter', () => {
       messages: [{ role: 'user', content: [{ type: 'text', text: 'Hi' }] }],
     })) {
       chunks.push(chunk)
+      accumulator.push({ time: chunks.length, chunk })
     }
 
     expect(chunks.some(c => c.type === 'block-start' && c.blockType === 'reasoning')).toBe(true)
@@ -99,6 +102,7 @@ describe('UniversalLlmAdapter', () => {
     expect(chunks.some(c => c.type === 'tool-call-delta' && c.id === 'call-1')).toBe(true)
 
     expect(chunks.some(c => c.type === 'usage' && c.usage.totalTokens === 35)).toBe(true)
+    expect(chunks.find(c => c.type === 'usage').usage).not.toHaveProperty('cacheReadTokens')
     expect(chunks[chunks.length - 1]).toEqual({ type: 'finish', reason: { kind: 'tool-calls' } })
   })
 

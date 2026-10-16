@@ -57,6 +57,10 @@ interface QuotaWindowView {
 interface QuotaReportView {
   readonly provider: string;
   readonly windows: readonly QuotaWindowView[];
+  readonly models?: Record<string, {
+    remainingPercent: number;
+    resetsAt?: number;
+  }>;
   readonly account?: {
     authIndex: string;
     label: string;

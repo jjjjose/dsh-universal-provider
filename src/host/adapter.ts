@@ -1,4 +1,5 @@
 import type { ServerSupervisor } from './server.ts'
+import { normalizeUsage } from './usage.ts'
 import type { ProxyRequestBody } from '../core/api/proxy-client.ts'
 import { matchCatalogModel } from '../core/models/catalog-match.ts'
 import { fetchCatalog, type ModelCatalogs } from '../core/models/catalog.ts'
@@ -237,7 +238,7 @@ export class UniversalLlmAdapter extends LlmAdapter {
             kind: 'error',
             failure: {
               code: streamError.name || 'STREAM_ERROR',
-              message: streamError.message,
+               message: streamError instanceof Error ? streamError.message : String(streamError),
               ...(status ? { status } : {}),
             },
           },
@@ -267,12 +268,7 @@ export class UniversalLlmAdapter extends LlmAdapter {
       if (capturedUsage) {
         yield {
           type: 'usage',
-          usage: {
-            inputTokens: capturedUsage.prompt_tokens ?? capturedUsage.input_tokens ?? 0,
-            outputTokens: capturedUsage.completion_tokens ?? capturedUsage.output_tokens ?? 0,
-            totalTokens: capturedUsage.total_tokens ?? 0,
-            cacheReadTokens: capturedUsage.prompt_tokens_details?.cached_tokens,
-          },
+          usage: normalizeUsage(capturedUsage),
         }
       }
 

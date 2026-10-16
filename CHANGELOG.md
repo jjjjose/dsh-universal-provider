@@ -8,6 +8,12 @@ El formato se basa en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/
 
 ## [Unreleased]
 
+## [0.31.1] - 2026-10-15
+
+### Añadido
+- **Cuotas por modelo (Antigravity/Google):** `QuotaReportView` expone `models` y el nuevo `quotaEntries()` combina las ventanas con la cuota restante por modelo, incluyendo su tiempo de reinicio. El panel muestra cada cuenta con sus barras de cuota y maneja los estados vacío, de carga y de error.
+- **Normalización de uso de tokens:** Nuevo `normalizeUsage()` que unifica los formatos OpenAI (`prompt_tokens`/`completion_tokens`/`input_tokens_details`) y Anthropic (`cache_read_input_tokens`/`cache_creation_input_tokens`), suma la caché al input en Anthropic, calcula `totalTokens` y omite `cacheReadTokens` cuando no existe.
+
 ## [0.31.0] - 2026-10-15
 
 ### Añadido

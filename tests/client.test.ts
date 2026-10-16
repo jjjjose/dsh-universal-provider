@@ -3,6 +3,7 @@ import vm from 'node:vm'
 import ts from 'typescript'
 import { describe, expect, it, vi } from 'vitest'
 import { expectRemote } from '../src/client/remote-result.ts'
+import { quotaEntries } from '../src/client/quota-entries.ts'
 
 // Exercise the client entry as DSH loads it, with its runtime require boundary.
 // The small hook driver runs page effects without adding a DOM dependency.
@@ -34,6 +35,7 @@ function loadClient(remoteModule: unknown = { default: {} }, browser: any = {}, 
       if (id === 'universal-provider/remote') return remoteModule
       if (id === './oauth-flow.ts') return { waitForOAuth }
       if (id === './remote-result.ts') return { expectRemote }
+      if (id === './quota-entries.ts') return { quotaEntries }
       throw new Error(`Unexpected client dependency: ${id}`)
     },
     window: browser,
@@ -72,6 +74,7 @@ function context(client: any, mount = vi.fn().mockResolvedValue(undefined)) {
     listModels: vi.fn().mockResolvedValue({ ok: true, value: [{ provider: 'universal-chat-provider', id: 'test-model', name: 'Test model' }] }),
     startOAuth: vi.fn().mockResolvedValue({ ok: true, value: { url: 'https://example.com/oauth', state: 'oauth-state' } }),
     cancelOAuth: vi.fn().mockResolvedValue({ ok: true, value: true }),
+    getQuotas: vi.fn().mockResolvedValue({ ok: true, value: [] }),
   }
   const llm = { listModels: vi.fn().mockResolvedValue({ ok: true, value: [{ id: 'test-model' }] }) }
   const services = {
@@ -109,6 +112,33 @@ function context(client: any, mount = vi.fn().mockResolvedValue(undefined)) {
 }
 
 describe('DSH client configuration entry', () => {
+  it('shows Google model quotas alongside GPT and reports empty and failed accounts', async () => {
+    const { client, renderTree, render } = loadClient()
+    const { ctx, entries, api } = context(client)
+    api.getQuotas.mockResolvedValue({ ok: true, value: [
+      { provider: 'codex', windows: [{ label: '5h', remainingPercent: 80 }] },
+      { provider: 'antigravity', account: { authIndex: 'a', label: 'Google A' }, windows: [], models: { 'gemini-pro': { remainingPercent: 0, resetsAt: 4070908800000 } } },
+      { provider: 'antigravity', account: { authIndex: 'b', label: 'Google B' }, windows: [], models: { 'gemini-flash': { remainingPercent: 75 } } },
+      { provider: 'antigravity', windows: [], error: 'missing project_id' },
+      { provider: 'antigravity', windows: [], models: {} },
+    ] } as any)
+    await client.apply(ctx)
+    const component = entries[0]!.component
+    const find = (node: any): any => {
+      if (!node || typeof node !== 'object') return
+      if (node.type === 'button' && node.children?.includes('Cuotas')) return node
+      for (const child of Array.isArray(node) ? node : node.children ?? []) {
+        const match = find(child)
+        if (match) return match
+      }
+    }
+    find(renderTree(component)).props.onClick()
+    await vi.waitFor(() => expect(render(component)).toContain('gemini-pro'))
+    const result = render(component)
+    for (const text of ['gemini-pro', 'gemini-flash', 'Google A', 'Google B', '0%', '75%', '80%', 'Reinicio:', 'missing project_id', 'Sin datos de cuotas disponibles.']) {
+      expect(result).toContain(text)
+    }
+  })
   it.each([
     ['antigravity', 'popup'],
     ['codex', 'popup'],

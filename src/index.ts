@@ -218,6 +218,7 @@ export class UniversalProviderService extends TypertRemoteService {
     const reports = await fetchQuotas(mgmt, signal)
     return reports.map(r => ({
       provider: r.provider,
+      ...(r.models !== undefined ? { models: r.models } : {}),
       windows: r.windows.map(w => ({
         label: w.label,
         ...(w.remainingPercent !== undefined ? { remainingPercent: w.remainingPercent } : {}),

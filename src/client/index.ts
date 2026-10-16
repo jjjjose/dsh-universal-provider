@@ -1,5 +1,7 @@
 import { waitForOAuth } from './oauth-flow.ts'
 import { expectRemote } from './remote-result.ts'
+import { quotaEntries } from './quota-entries.ts'
+import type { QuotaReportView } from '../types.ts'
 import type { PluginConfigViewProps } from '@deepseek-ai/dsh-client-ui-plugin-manager/client'
 import type { SlotRegistry } from '@deepseek-ai/dsh-client-ui-renderer/client'
 
@@ -37,7 +39,7 @@ function registerSettings(ctx: ClientContext, mountError: string | null = null) 
         const [status, setStatus] = useState<any>(null)
         const [accounts, setAccounts] = useState<any[]>([])
         const [endpoints, setEndpoints] = useState<any[]>([])
-        const [quotas, setQuotas] = useState<any[]>([])
+        const [quotas, setQuotas] = useState<QuotaReportView[]>([])
         const [logs, setLogs] = useState<string[]>([])
         const [loading, setLoading] = useState(false)
         const [error, setError] = useState<string | null>(null)
@@ -100,8 +102,9 @@ function registerSettings(ctx: ClientContext, mountError: string | null = null) 
         const refreshQuotas = async () => {
           if (!remote) return
           setLoading(true)
+          setError(null)
           try {
-            const q = await expectRemote<any[]>(remote.getQuotas())
+            const q = await expectRemote<QuotaReportView[]>(remote.getQuotas())
             setQuotas(q || [])
           } catch (e: any) {
             setError(e?.message || 'Error fetching quotas')
@@ -540,7 +543,7 @@ function registerSettings(ctx: ClientContext, mountError: string | null = null) 
                 },
               }, loading ? 'Consultando...' : 'Refrescar Cuotas'),
             ]),
-            quotas.length === 0 ? h('p', { style: { color: 'var(--dsw-alias-text-secondary, #94a3b8)', fontSize: '13px' } }, 'No se encontraron reportes de cuotas.') : null,
+            quotas.length === 0 ? h('p', { style: { color: 'var(--dsw-alias-text-secondary, #94a3b8)', fontSize: '13px' } }, loading ? 'Consultando cuotas...' : error ? 'No se pudieron consultar las cuotas.' : 'No se encontraron reportes de cuotas.') : null,
             h('div', { style: { display: 'flex', flexDirection: 'column', gap: '10px' } }, quotas.map((q, idx) => h('div', {
               key: `${q.provider}-${idx}`,
               style: {
@@ -552,7 +555,8 @@ function registerSettings(ctx: ClientContext, mountError: string | null = null) 
               h('div', { style: { fontWeight: 600, fontSize: '14px', marginBottom: '8px' } },
                 `${q.provider.toUpperCase()} ${q.account?.label ? `(${q.account.label})` : ''}`),
               q.error ? h('div', { style: { color: '#f87171', fontSize: '12px' } }, q.error) : null,
-              h('div', { style: { display: 'flex', gap: '16px', flexWrap: 'wrap' } }, q.windows?.map((w: any) => h('div', {
+              !q.error && quotaEntries(q).length === 0 ? h('div', null, 'Sin datos de cuotas disponibles.') : null,
+              h('div', { style: { display: 'flex', gap: '16px', flexWrap: 'wrap' } }, quotaEntries(q).map(w => h('div', {
                 key: w.label,
                 style: {
                   padding: '8px 12px',
@@ -564,6 +568,7 @@ function registerSettings(ctx: ClientContext, mountError: string | null = null) 
                 h('div', { style: { color: 'var(--dsw-alias-text-secondary, #94a3b8)' } }, w.label),
                 h('div', { style: { fontSize: '16px', fontWeight: 600, color: '#38bdf8' } },
                   w.remainingPercent !== undefined ? `${Math.round(w.remainingPercent)}%` : '-'),
+                w.resetsAt !== undefined ? h('div', null, `Reinicio: ${new Date(w.resetsAt).toLocaleString()}`) : null,
               ]))),
             ]))),
           ]) : null,

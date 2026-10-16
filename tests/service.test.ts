@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
 import { apply, inject, UniversalProviderService } from '../src/index.ts'
+import { quotaEntries } from '../src/client/quota-entries.ts'
 
 describe('UniversalProviderService RPC Methods', () => {
   it('activates with declared llm injection and serves RPCs without optional host services', async () => {
@@ -166,5 +167,38 @@ describe('UniversalProviderService RPC Methods', () => {
   it('returns formatted recent logs', async () => {
     const logs = await service.getRecentLogs()
     expect(Array.isArray(logs)).toBe(true)
+  })
+
+  it('preserves per-account Google model quotas from the API through the UI entries', async () => {
+    const resetTime = '2099-01-01T00:00:00Z'
+    const management = {
+      listAuthFilesRaw: async () => [
+        { provider: 'antigravity', auth_index: 'google-1', project_id: 'project-1' },
+        { provider: 'antigravity', auth_index: 'google-2', project_id: 'project-2' },
+        { provider: 'antigravity', auth_index: 'google-missing' },
+        { provider: 'codex', auth_index: 'gpt' },
+      ],
+      apiCall: async (request: any) => {
+        if (request.auth_index === 'gpt') return mockSupervisor.getManagementClient().apiCall()
+        expect(request.url).toBe('https://cloudcode-pa.googleapis.com/v1internal:fetchAvailableModels')
+        expect(request.method).toBe('POST')
+        expect(JSON.parse(request.data)).toEqual({ project: request.auth_index === 'google-1' ? 'project-1' : 'project-2' })
+        return { statusCode: 200, header: {}, body: JSON.stringify({ models: {
+          'gemini-pro': { quotaInfo: { remainingFraction: request.auth_index === 'google-1' ? 0 : 0.75, resetTime } },
+        } }) }
+      },
+    }
+    const instance = new UniversalProviderService(new Context(), {
+      ...mockSupervisor, getManagementClient: () => management,
+    }, paths, config)
+    const reports = await instance.getQuotas()
+    expect(reports).toHaveLength(4)
+    expect(quotaEntries(reports[0]!)).toEqual([{ label: 'gemini-pro', remainingPercent: 0, resetsAt: Date.parse(resetTime) }])
+    expect(quotaEntries(reports[1]!)[0]?.remainingPercent).toBe(75)
+    expect(reports[1]?.account?.authIndex).toBe('google-2')
+    expect(reports[2]?.error).toBe('missing project_id')
+    expect(quotaEntries(reports[2]!)).toEqual([])
+    expect(quotaEntries(reports[3]!)[0]?.remainingPercent).toBe(80)
+    expect(JSON.parse(JSON.stringify(reports))).toStrictEqual(reports)
   })
 })
