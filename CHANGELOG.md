@@ -8,6 +8,18 @@ El formato se basa en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/
 
 ## [Unreleased]
 
+## [0.32.4] - 2026-10-16
+
+### Añadido
+- **Carga inicial de modelos en segundo plano:** `apply` inicia la carga del catálogo al activar, con hasta 3 intentos y backoff (1 s, 2 s), sin bloquear la activación; al desactivar cancela la carga en curso y la espera antes de liberar el supervisor.
+- **Cobertura:** Nuevo `tests/startup.test.ts` (reintento ante fallo transitorio, activación no bloqueante y cancelación de reintentos programados), más comprobaciones de descubrimiento compartido y publicación del catálogo.
+
+### Cambiado
+- **Descubrimiento compartido:** `listModels` reutiliza la promesa en vuelo por proveedor (llamadas concurrentes comparten una sola consulta) y expone el trabajo en `discoverModels()`, con comprobaciones de `AbortSignal` adicionales.
+
+### Corregido
+- **Arranque fallido del supervisor:** Si `ensureRunning` falla, el supervisor se libera (`dispose()`) y se relanza el error, evitando estados a medio iniciar; se añaden puntos de cancelación (`throwIfAborted`) en los caminos externo y gestionado.
+
 ## [0.32.3] - 2026-10-16
 
 ### Mejorado

@@ -14,6 +14,7 @@ export interface ModelInfo extends ModelView, LlmModelInfo {}
 export class UniversalLlmAdapter extends LlmAdapter {
   private catalogs?: ModelCatalogs
   private publishedCatalog = ''
+  private pendingModels = new Map<string, Promise<readonly ModelInfo[]>>()
   onModelsChanged: (() => void) | undefined
 
   constructor(private readonly supervisor: ServerSupervisor, readonly contextSettings = new ModelContextSettings()) { super() }
@@ -44,6 +45,20 @@ export class UniversalLlmAdapter extends LlmAdapter {
 
   override async listModels(provider: string, signal?: AbortSignal): Promise<readonly ModelInfo[]> {
     signal?.throwIfAborted()
+    let pending = this.pendingModels.get(provider)
+    if (!pending) {
+      pending = this.discoverModels(provider, signal).finally(() => {
+        this.pendingModels.delete(provider)
+      })
+      this.pendingModels.set(provider, pending)
+    }
+    const models = await pending
+    signal?.throwIfAborted()
+    return models
+  }
+
+  private async discoverModels(provider: string, signal?: AbortSignal): Promise<readonly ModelInfo[]> {
+    signal?.throwIfAborted()
     await this.supervisor.ensureRunning(signal)
     const client = this.supervisor.getProxyClient()
     if (!client) {
@@ -59,6 +74,7 @@ export class UniversalLlmAdapter extends LlmAdapter {
     signal?.throwIfAborted()
 
     const contexts = await this.contextSettings.all()
+    signal?.throwIfAborted()
     const models = discovery.available.map((entry) => {
       const metadata = discovery.metadata.find(m => m.slug === entry.id)
       const catalogMatch = this.catalogs ? matchCatalogModel(entry.id, this.catalogs.router) : undefined

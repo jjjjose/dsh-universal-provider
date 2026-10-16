@@ -3,6 +3,7 @@ import { Remote, TypertRemoteService } from '@deepseek-ai/dsh-typert-protocol'
 import { readFile } from 'node:fs/promises'
 import { existsSync } from 'node:fs'
 import { join } from 'node:path'
+import { setTimeout as delay } from 'node:timers/promises'
 import { ModelContextSettings } from './host/model-context.ts'
 import type {
   PingResult,
@@ -304,7 +305,30 @@ export function apply(ctx: Context, config: ProviderConfig) {
     }])
   }
 
-  ctx.effect(() => () => {
-    supervisor.dispose()
+  ctx.effect(() => {
+    const controller = new AbortController()
+    const loading = (async () => {
+      for (let attempt = 0; attempt < 3; attempt++) {
+        try {
+          await adapter.listModels('universal-chat-provider', controller.signal)
+          return
+        } catch (error) {
+          if (controller.signal.aborted) return
+          ctx.logger.warn('Universal Provider: no se pudo cargar el catálogo inicial de modelos', error)
+          if (attempt < 2) {
+            try {
+              await delay(1000 * (attempt + 1), undefined, { signal: controller.signal })
+            } catch {
+              return
+            }
+          }
+        }
+      }
+    })()
+    return async () => {
+      controller.abort()
+      await loading
+      await supervisor.dispose()
+    }
   })
 }

@@ -72,6 +72,9 @@ export class ServerSupervisor {
     try {
       this.info = await this.startingPromise
       return this.info
+    } catch (error) {
+      await this.dispose()
+      throw error
     } finally {
       this.startingPromise = undefined
     }
@@ -82,6 +85,7 @@ export class ServerSupervisor {
       const baseUrl = this.config.externalUrl.replace(/\/+$/, '')
       const apiKey = await this.resolveCredential(this.config.apiKeyEnv) ?? ''
       const mgmtKey = await this.resolveCredential(this.config.managementKeyEnv) ?? ''
+      signal?.throwIfAborted()
 
       this.client = new CLIProxyClient(baseUrl, apiKey)
       if (mgmtKey) {
@@ -118,6 +122,7 @@ export class ServerSupervisor {
       log: msg => (this.ctx as any).logger?.info?.(msg),
       ...(signal !== undefined ? { signal } : {}),
     })
+    signal?.throwIfAborted()
 
     const port = await this.getFreePort(this.config.port)
     const apiKey = generateSecret()
@@ -133,6 +138,7 @@ export class ServerSupervisor {
     })
 
     await writeFile(this.paths.configPath, configYaml, { mode: 0o600 })
+    signal?.throwIfAborted()
 
     const baseUrl = `http://127.0.0.1:${port}`
 

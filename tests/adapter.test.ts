@@ -9,6 +9,18 @@ import { ModelContextSettings } from '../src/host/model-context.ts'
 vi.mock('../src/core/models/catalog.ts', () => ({ fetchCatalog: vi.fn(async () => { throw new Error('offline') }) }))
 
 describe('UniversalLlmAdapter', () => {
+  it('shares discovery while startup and the panel request models concurrently', async () => {
+    const discover = vi.fn().mockResolvedValue({ available: [], metadata: [] })
+    const adapter = new UniversalLlmAdapter({
+      ensureRunning: async () => {},
+      getProxyClient: () => ({ discover }),
+    } as any)
+    await Promise.all([adapter.listModels('provider'), adapter.listModels('provider')])
+    expect(discover).toHaveBeenCalledOnce()
+    await adapter.listModels('provider')
+    expect(discover).toHaveBeenCalledTimes(2)
+  })
+
   it('lists the real context versions and defaults to the largest before listing models', async () => {
     const adapter = new UniversalLlmAdapter({
       ensureRunning: async () => {},

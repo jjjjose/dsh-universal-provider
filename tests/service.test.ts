@@ -1,14 +1,17 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
 import { apply, inject, UniversalProviderService } from '../src/index.ts'
 import { quotaEntries } from '../src/client/quota-entries.ts'
+import { CLIProxyClient } from '../src/core/api/proxy-client.ts'
 
 describe('UniversalProviderService RPC Methods', () => {
   it('activates with declared llm injection and serves RPCs without optional host services', async () => {
     const root = new Context()
     let adapterRegistered = false
+    const discovery = vi.spyOn(CLIProxyClient.prototype, 'discover').mockResolvedValue({ available: [], metadata: [] })
+    const replace = vi.fn()
     const removeLlm = root.provide('llm', {
-      registerAdapter: () => { adapterRegistered = true },
+      registerAdapter: () => { adapterRegistered = true; return { replace } },
       registerConfigurableProviders: () => {},
     })
     const fiber = root.plugin({ apply, inject }, {
@@ -23,6 +26,8 @@ describe('UniversalProviderService RPC Methods', () => {
     try {
       await fiber
       expect(adapterRegistered).toBe(true)
+      await vi.waitFor(() => expect(replace).toHaveBeenCalledWith(['universal-chat-provider']))
+      expect(discovery).toHaveBeenCalledOnce()
       for (const name of ['credentials', 'subprocess', 'configEditor']) {
         expect(root.get(name)).toBeUndefined()
       }
@@ -36,6 +41,7 @@ describe('UniversalProviderService RPC Methods', () => {
     } finally {
       await fiber.dispose()
       removeLlm()
+      discovery.mockRestore()
     }
   })
 

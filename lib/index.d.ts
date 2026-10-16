@@ -224,6 +224,7 @@ declare class UniversalLlmAdapter extends LlmAdapter {
   readonly contextSettings: ModelContextSettings;
   private catalogs?;
   private publishedCatalog;
+  private pendingModels;
   onModelsChanged: (() => void) | undefined;
   constructor(supervisor: ServerSupervisor, contextSettings?: ModelContextSettings);
   setModelContext(model: string, contextWindow: number): Promise<void>;
@@ -235,6 +236,7 @@ declare class UniversalLlmAdapter extends LlmAdapter {
   imageRequestPricing(_provider: string, _model: string): undefined;
   defaultFallbackModels(_provider: string): ModelInfo[];
   listModels(provider: string, signal?: AbortSignal): Promise<readonly ModelInfo[]>;
+  private discoverModels;
   resolveModel(provider: string, model: string, signal?: AbortSignal): Promise<LlmResolvedModelInfo>;
   prepareCall(provider: string, model: string, signal?: AbortSignal): Promise<{
     model: LlmResolvedModelInfo;
