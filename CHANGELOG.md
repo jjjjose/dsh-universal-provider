@@ -8,6 +8,18 @@ El formato se basa en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/
 
 ## [Unreleased]
 
+## [0.31.0] - 2026-10-15
+
+### Añadido
+- **Integración con `@deepseek-ai/dsh-llm`:** `UniversalLlmAdapter` ahora extiende la clase base `LlmAdapter` del host y declara `@deepseek-ai/dsh-llm` como dependencia y peer. El cliente de proxy incorpora las cabeceras de atribución (`attributionHeaders()`).
+- **Esfuerzos de razonamiento:** `resolveModel` publica `reasoning.efforts` a partir de `supported_reasoning_levels`, conservando los IDs del proveedor (incluido `off`) y estableciendo `defaultEffort` solo si el proveedor lo informa y pertenece a la lista.
+- **Actualización del catálogo ante cambios:** El servicio refresca los modelos al completar OAuth y al eliminar una cuenta, y el adaptador notifica al registro de modelos cuando el catálogo o sus metadatos cambian.
+- **Documentación:** Nueva guía `docs/MODEL_INTEGRATION.md` sobre el contrato de modelos y esfuerzo con `dsh-llm` 0.2.1-alpha.2.
+
+### Cambiado
+- **Errores tipados:** `resolveModel` y `stream` usan `LlmError` (`PROVIDER_UNAVAILABLE`, `MODEL_UNAVAILABLE`) en lugar de un texto simulado de reserva cuando el servidor o el modelo no están disponibles.
+- **Empaquetado:** `tsdown` deja de empaquetar las dependencias `@deepseek-ai/*` (`neverBundle`), que permanecen externas en el bundle del servidor.
+
 ## [0.30.6] - 2026-10-15
 
 ### Corregido
