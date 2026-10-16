@@ -8,6 +8,14 @@ El formato se basa en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/
 
 ## [Unreleased]
 
+## [0.30.6] - 2026-10-15
+
+### Corregido
+- **Contrato Typert de `listModels`:** El generador de contratos (`scripts/build-typert.mjs`) declara el método `listModels` y el esquema estricto `ModelsList`, de modo que el host y el cliente remoto exponen realmente la invocación `universal-provider#universalProvider/listModels`. Antes faltaba en los artefactos generados y la llamada del panel no estaba tipada ni validada.
+
+### Añadido
+- **Prueba de empaquetado:** La suite verifica que los descriptores del paquete y los generados coinciden para `listModels`, incluyendo la firma, la cancelación por `signal` y la validación de `ModelsList` (acepta modelos y lista vacía, rechaza entradas incompletas).
+
 ## [0.30.5] - 2026-10-15
 
 ### Añadido
