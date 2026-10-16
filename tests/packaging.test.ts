@@ -124,6 +124,20 @@ describe('Git installation package', () => {
       expect(artifact.descriptors.map((entry: any) => entry.id)).toEqual(
         generated.descriptors.map((entry: any) => entry.id),
       )
+      const { TYPERT: host } = await import(new URL('lib/typert.host.js', root).href)
+      const models = [{ provider: 'universal-chat-provider', id: 'gpt-test', name: 'GPT Test',
+        description: 'Available model', inputModalities: ['text', 'image'] }]
+      for (const descriptors of [artifact.descriptors, generated.descriptors, host.invocations]) {
+        const descriptor = descriptors.find((entry: any) => entry.method === 'listModels')
+        expect(descriptor).toMatchObject({
+          id: 'universal-provider#universalProvider/listModels',
+          service: 'universalProvider', namespace: 'universalProvider',
+          parameters: [], cancellation: { parameter: 'signal' },
+        })
+        expect(descriptor.result.create().parse(models)).toEqual(models)
+        expect(descriptor.result.create().parse([])).toEqual([])
+        expect(() => descriptor.result.create().parse([{ id: 'missing-fields' }])).toThrow()
+      }
       // Compare an actual schema result too: descriptor IDs alone cannot detect stale codecs.
       const quota = [{ provider: 'codex', windows: [{ label: 'credits', balance: {
         amount: 12, currency: 'USD', suffix: 'left',

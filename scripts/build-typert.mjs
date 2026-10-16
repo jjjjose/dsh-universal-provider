@@ -26,6 +26,15 @@ export const getStatusResultSchema = () => (_statusResultSchema ??= z.object({
   baseUrl: z.string().readonly(),
 }))
 
+let _modelsListSchema
+export const getModelsListSchema = () => (_modelsListSchema ??= z.array(z.object({
+  provider: z.string(),
+  id: z.string(),
+  name: z.string(),
+  description: z.string().optional(),
+  inputModalities: z.array(z.enum(['text', 'image'])).readonly().optional(),
+})).readonly())
+
 let _accountViewSchema
 export const getAccountViewSchema = () => (_accountViewSchema ??= z.object({
   name: z.string().readonly(),
@@ -112,6 +121,21 @@ export const getLogsListSchema = () => (_logsListSchema ??= z.array(z.string()))
 `
 
 const invocationsCode = `[
+    {
+      id: 'universal-provider#universalProvider/listModels',
+      service: 'universalProvider',
+      namespace: 'universalProvider',
+      method: 'listModels',
+      invocation: { kind: 'direct' },
+      parameters: [],
+      cancellation: { parameter: 'signal' },
+      result: {
+        mode: 'strict',
+        typeSymbol: 'universal-provider/types#ModelsList',
+        create: getModelsListSchema,
+      },
+      sourceLocation: { file: 'src/index.ts', line: 82, column: 3 },
+    },
     {
       id: 'universal-provider#universalProvider/ping',
       service: 'universalProvider',
@@ -427,6 +451,7 @@ export const TYPERT = {
         key: 'universalProvider',
         exportName: 'UniversalProviderService',
         members: [
+          { kind: 'method', name: 'listModels', signature: '@Remote async listModels(signal?: AbortSignal): Promise<readonly ModelView[]>' },
           { kind: 'method', name: 'ping', signature: '@Remote async ping(signal?: AbortSignal): Promise<PingResult>' },
           { kind: 'method', name: 'getState', signature: '@Remote async getState(signal?: AbortSignal): Promise<ProviderStatus>' },
           { kind: 'method', name: 'listAccounts', signature: '@Remote async listAccounts(signal?: AbortSignal): Promise<AccountView[]>' },
@@ -443,6 +468,7 @@ export const TYPERT = {
           { kind: 'method', name: 'configureCompaction', signature: '@Remote async configureCompaction(model: string, signal?: AbortSignal): Promise<boolean>' },
         ],
         types: [
+          { name: 'ModelView', declaration: 'export interface ModelView { provider: string; id: string; name: string; description?: string; inputModalities?: readonly ("text" | "image")[]; }' },
           { name: 'PingResult', declaration: 'export interface PingResult { readonly message: string; readonly timestamp: number; }' },
           { name: 'ProviderStatus', declaration: 'export interface ProviderStatus { readonly status: string; readonly version: string; readonly mode: "managed" | "external"; readonly port?: number; readonly activeRequests: number; readonly baseUrl: string; }' },
           { name: 'AccountView', declaration: 'export interface AccountView { readonly name: string; readonly type?: string; readonly provider?: string; readonly email?: string; readonly label?: string; }' },
@@ -476,7 +502,7 @@ export default TYPERT_REMOTE
 `
 
 const typertRemoteDts = `/* Generated Typert Remote client declaration for universal-provider */
-import type { PingResult, ProviderStatus, AccountView, OAuthStartResult, OAuthPollResult, EndpointView, QuotaReportView, CommitDraftResult } from './types.js'
+import type { ModelView, PingResult, ProviderStatus, AccountView, OAuthStartResult, OAuthPollResult, EndpointView, QuotaReportView, CommitDraftResult } from './types.js'
 
 export declare const TYPERT_REMOTE: unknown;
 export default TYPERT_REMOTE;
@@ -488,6 +514,7 @@ declare module '@deepseek-ai/dsh-typert-protocol' {
 }
 
 export interface UniversalProviderRemote {
+  listModels(signal?: AbortSignal): Promise<readonly ModelView[]>;
   ping(signal?: AbortSignal): Promise<PingResult>;
   getState(signal?: AbortSignal): Promise<ProviderStatus>;
   listAccounts(signal?: AbortSignal): Promise<AccountView[]>;

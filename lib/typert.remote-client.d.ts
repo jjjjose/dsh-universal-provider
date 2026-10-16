@@ -1,5 +1,5 @@
 /* Generated Typert Remote client declaration for universal-provider */
-import type { PingResult, ProviderStatus, AccountView, OAuthStartResult, OAuthPollResult, EndpointView, QuotaReportView, CommitDraftResult } from './types.js'
+import type { ModelView, PingResult, ProviderStatus, AccountView, OAuthStartResult, OAuthPollResult, EndpointView, QuotaReportView, CommitDraftResult } from './types.js'
 
 export declare const TYPERT_REMOTE: unknown;
 export default TYPERT_REMOTE;
@@ -11,6 +11,7 @@ declare module '@deepseek-ai/dsh-typert-protocol' {
 }
 
 export interface UniversalProviderRemote {
+  listModels(signal?: AbortSignal): Promise<readonly ModelView[]>;
   ping(signal?: AbortSignal): Promise<PingResult>;
   getState(signal?: AbortSignal): Promise<ProviderStatus>;
   listAccounts(signal?: AbortSignal): Promise<AccountView[]>;
