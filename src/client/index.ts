@@ -612,20 +612,35 @@ function registerSettings(ctx: ClientContext, mountError: string | null = null) 
                 `${q.provider.toUpperCase()} ${q.account?.label ? `(${q.account.label})` : ''}`),
               q.error ? h('div', { style: { color: '#f87171', fontSize: '12px' } }, q.error) : null,
               !q.error && quotaEntries(q).length === 0 ? h('div', null, 'Sin datos de cuotas disponibles.') : null,
-              h('div', { style: { display: 'flex', gap: '16px', flexWrap: 'wrap' } }, quotaEntries(q).map(w => h('div', {
+              h('div', { style: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 240px), 1fr))', gap: '16px' } }, quotaEntries(q).map(w => {
+                const percent = w.remainingPercent !== undefined && Number.isFinite(w.remainingPercent)
+                  ? Math.max(0, Math.min(100, w.remainingPercent)) : undefined
+                const color = percent === undefined ? '#94a3b8'
+                  : percent > 50 ? '#4ade80' : percent > 20 ? '#facc15' : percent > 10 ? '#fb923c' : '#f87171'
+                return h('div', {
                 key: w.label,
                 style: {
                   padding: '8px 12px',
-                  background: '#0f172a',
+                  background: 'var(--dsw-alias-bg-surface-primary, #0f172a)',
                   borderRadius: '6px',
                   fontSize: '12px',
                 },
               }, [
-                h('div', { style: { color: 'var(--dsw-alias-text-secondary, #94a3b8)' } }, w.label),
-                h('div', { style: { fontSize: '16px', fontWeight: 600, color: '#38bdf8' } },
-                  w.remainingPercent !== undefined ? `${Math.round(w.remainingPercent)}%` : '-'),
-                w.resetsAt !== undefined ? h('div', null, `Reinicio: ${new Date(w.resetsAt).toLocaleString()}`) : null,
-              ]))),
+                h('div', { style: { color: 'var(--dsw-alias-text-secondary, #94a3b8)', marginBottom: '6px', overflowWrap: 'anywhere' } }, w.label),
+                h('div', { style: { display: 'flex', alignItems: 'center', gap: '10px' } }, [
+                  h('div', {
+                    ...(percent === undefined ? { 'aria-hidden': true } : {
+                      role: 'progressbar', 'aria-label': `Cuota restante de ${w.label}`,
+                      'aria-valuemin': 0, 'aria-valuemax': 100, 'aria-valuenow': percent,
+                    }),
+                    style: { flex: 1, height: '4px', borderRadius: '999px', overflow: 'hidden', background: 'var(--dsw-alias-border, #334155)' },
+                  }, h('div', { style: { width: `${percent ?? 0}%`, height: '100%', borderRadius: 'inherit', background: color } })),
+                  h('span', { style: { color, fontWeight: 600, minWidth: '4ch', textAlign: 'right', fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' } },
+                    percent === undefined ? 'Sin datos' : `${Math.round(percent)}%`),
+                ]),
+                w.resetsAt !== undefined ? h('div', { style: { marginTop: '5px', fontSize: '11px', color: 'var(--dsw-alias-text-secondary, #94a3b8)' } }, `Reinicio: ${new Date(w.resetsAt).toLocaleString()}`) : null,
+              ])
+              })),
             ]))),
           ]) : null,
 

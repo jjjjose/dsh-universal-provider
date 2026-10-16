@@ -8,6 +8,11 @@ El formato se basa en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/
 
 ## [Unreleased]
 
+## [0.32.3] - 2026-10-16
+
+### Mejorado
+- **Panel de cuotas:** Las cuotas se muestran en una rejilla adaptable con una barra de progreso por entrada, coloreada según el porcentaje restante (>50% verde, >20% amarillo, >10% naranja, resto rojo) y con el porcentaje acotado a 0–100. Se añade `role="progressbar"` con valores ARIA, se muestra «Sin datos» cuando no hay porcentaje y los fondos respetan el tema (`--dsw-alias-*`).
+
 ## [0.32.2] - 2026-10-16
 
 ### Corregido
