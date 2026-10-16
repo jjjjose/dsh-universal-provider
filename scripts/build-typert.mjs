@@ -34,6 +34,7 @@ export const getModelsListSchema = () => (_modelsListSchema ??= z.array(z.object
   description: z.string().optional(),
   inputModalities: z.array(z.enum(['text', 'image'])).readonly().optional(),
   contextWindow: z.number().optional(),
+  contextOptions: z.array(z.object({ value: z.number(), label: z.string() })).readonly().optional(),
 })).readonly())
 
 let _accountViewSchema
@@ -484,7 +485,7 @@ export const TYPERT = {
           { kind: 'method', name: 'configureCompaction', signature: '@Remote async configureCompaction(model: string, signal?: AbortSignal): Promise<boolean>' },
         ],
         types: [
-          { name: 'ModelView', declaration: 'export interface ModelView { provider: string; id: string; name: string; contextWindow?: number; description?: string; inputModalities?: readonly ("text" | "image")[]; }' },
+          { name: 'ModelView', declaration: 'export interface ModelView { provider: string; id: string; name: string; contextWindow?: number; contextOptions?: readonly { value: number; label: string }[]; description?: string; inputModalities?: readonly ("text" | "image")[]; }' },
           { name: 'PingResult', declaration: 'export interface PingResult { readonly message: string; readonly timestamp: number; }' },
           { name: 'ProviderStatus', declaration: 'export interface ProviderStatus { readonly status: string; readonly version: string; readonly mode: "managed" | "external"; readonly port?: number; readonly activeRequests: number; readonly baseUrl: string; }' },
           { name: 'AccountView', declaration: 'export interface AccountView { readonly name: string; readonly type?: string; readonly provider?: string; readonly email?: string; readonly label?: string; }' },

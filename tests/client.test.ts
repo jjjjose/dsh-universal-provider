@@ -113,9 +113,14 @@ function context(client: any, mount = vi.fn().mockResolvedValue(undefined)) {
 }
 
 describe('DSH client configuration entry', () => {
-  it('defaults to 1M and saves preset and custom model contexts', async () => {
+  it('shows real model context labels and saves their input limits and custom contexts', async () => {
     const { client, render, renderTree } = loadClient()
     const { ctx, entries, api } = context(client)
+    api.listModels.mockResolvedValue({ ok: true, value: [{
+      provider: 'universal-chat-provider', id: 'test-model', name: 'Test model',
+      contextWindow: 921000,
+      contextOptions: [{ value: 272000, label: '400K' }, { value: 921000, label: '1M' }],
+    }] } as any)
     await client.apply(ctx)
     const component = entries[0]!.component
     const find = (node: any, predicate: (node: any) => boolean): any => {
@@ -129,10 +134,12 @@ describe('DSH client configuration entry', () => {
     render(component)
     await vi.waitFor(() => expect(render(component)).toContain('Contexto de test-model'))
     const select = () => find(renderTree(component), n => n.props?.['aria-label'] === 'Contexto de test-model')
-    expect(select().props.value).toBe('1000000')
-    select().props.onChange({ target: { value: '500000' } })
-    await vi.waitFor(() => expect(select().props.value).toBe('500000'))
-    expect(api.setModelContext).toHaveBeenLastCalledWith({ model: 'test-model', contextWindow: 500000 })
+    expect(select().props.value).toBe('921000')
+    expect(JSON.stringify(select())).toContain('1M')
+    expect(JSON.stringify(select())).not.toContain('500000')
+    select().props.onChange({ target: { value: '272000' } })
+    await vi.waitFor(() => expect(select().props.value).toBe('272000'))
+    expect(api.setModelContext).toHaveBeenLastCalledWith({ model: 'test-model', contextWindow: 272000 })
     select().props.onChange({ target: { value: 'custom' } })
     find(renderTree(component), n => n.props?.['aria-label'] === 'Tokens de contexto de test-model').props.onChange({ target: { value: '1500000' } })
     find(renderTree(component), n => n.type === 'button' && n.children?.includes('Guardar contexto')).props.onClick()

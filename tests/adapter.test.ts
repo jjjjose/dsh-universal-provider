@@ -9,18 +9,22 @@ import { ModelContextSettings } from '../src/host/model-context.ts'
 vi.mock('../src/core/models/catalog.ts', () => ({ fetchCatalog: vi.fn(async () => { throw new Error('offline') }) }))
 
 describe('UniversalLlmAdapter', () => {
-  it('defaults to 1M even when discovery reports a smaller window', async () => {
+  it('lists the real context versions and defaults to the largest before listing models', async () => {
     const adapter = new UniversalLlmAdapter({
       ensureRunning: async () => {},
       getProxyClient: () => ({
         discover: async () => ({
-          available: [{ id: 'test-model', owned_by: 'test-provider', context_length: 272000 }],
-          metadata: [{ slug: 'test-model', context_window: 272000 }],
+          available: [{ id: 'test-model', owned_by: 'openai', context_length: 272000, max_completion_tokens: 128000 }],
+          metadata: [{ slug: 'test-model', context_window: 272000, max_context_window: 921000 }],
         }),
       }),
     } as any)
     const resolved = await adapter.resolveModel('universal-chat-provider', 'test-model')
-    expect(resolved.context?.contextWindow).toBe(1000000)
+    expect(resolved.context?.contextWindow).toBe(921000)
+    expect((await adapter.listModels('universal-chat-provider'))[0]).toMatchObject({
+      contextWindow: 921000,
+      contextOptions: [{ value: 272000, label: '400K' }, { value: 921000, label: '1M' }],
+    })
   })
 
   it('discovers all providers and removes models when their accounts disappear', async () => {
@@ -129,7 +133,7 @@ describe('UniversalLlmAdapter', () => {
     const model = await adapter.resolveModel('universal-chat-provider', 'claude-3-7-sonnet')
 
     expect(model.id).toBe('claude-3-7-sonnet')
-    expect(model.context?.contextWindow).toBe(1000000)
+    expect(model.context?.contextWindow).toBe(200000)
     expect(model.defaultMaxTokens).toBe(8192)
     expect(model.reasoning?.efforts[0]?.id).toBe('high')
   })

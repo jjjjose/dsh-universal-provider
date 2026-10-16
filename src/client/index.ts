@@ -54,7 +54,6 @@ function registerSettings(ctx: ClientContext, mountError: string | null = null) 
         const [modelsStatus, setModelsStatus] = useState('idle')
         const [contextDrafts, setContextDrafts] = useState<Record<string, string>>({})
         const [savingContext, setSavingContext] = useState<string | null>(null)
-        const contextPresets = [100000, 128000, 200000, 272000, 500000, 1000000, 2000000]
 
         const saveModelContext = async (model: string, contextWindow: number) => {
           if (!remote) return
@@ -377,10 +376,11 @@ function registerSettings(ctx: ClientContext, mountError: string | null = null) 
             h('h3', null, 'Modelos disponibles'),
             h('button', { type: 'button', disabled: modelsStatus === 'loading', onClick: refreshModelList }, modelsStatus === 'loading' ? 'Consultando modelos…' : 'Actualizar modelos'),
             modelsStatus === 'ready' && !availableModels.length ? h('p', null, 'No hay modelos disponibles para las cuentas y endpoints configurados.') : null,
-            h('p', null, 'Contexto por modelo: 1M de tokens por defecto. Los cambios se guardan y se comunican al Harness.'),
+            h('p', null, 'Opciones de contexto anunciadas por cada modelo. Por defecto se usa la mayor. Las etiquetas incluyen entrada + salida máxima, igual que en VS Code.'),
             modelsStatus === 'ready' ? h('ul', null, availableModels.map(model => {
               const current = model.contextWindow ?? 1000000
-              const custom = Object.hasOwn(contextDrafts, model.id) || !contextPresets.includes(current)
+              const contextOptions: { value: number; label: string }[] = model.contextOptions ?? []
+              const custom = Object.hasOwn(contextDrafts, model.id) || !contextOptions.some(option => option.value === current)
               const draft = contextDrafts[model.id] ?? String(current)
               return h('li', { key: `${model.provider}/${model.id}`, style: { marginBottom: '12px' } }, [
                 h('span', null, `${model.name} (${model.id}) `),
@@ -402,7 +402,7 @@ function registerSettings(ctx: ClientContext, mountError: string | null = null) 
                     }
                   },
                 }, [
-                  ...contextPresets.map(value => h('option', { key: value, value: String(value) }, value >= 1000000 ? `${value / 1000000}M` : `${value / 1000}k`)),
+                  ...contextOptions.map(option => h('option', { key: option.value, value: String(option.value) }, option.label)),
                   h('option', { value: 'custom' }, 'Personalizado'),
                 ]),
                 custom ? h('input', {
@@ -414,7 +414,7 @@ function registerSettings(ctx: ClientContext, mountError: string | null = null) 
                   type: 'button', disabled: savingContext !== null || !Number.isSafeInteger(Number(draft)) || Number(draft) <= 0,
                   onClick: () => void saveModelContext(model.id, Number(draft)),
                 }, 'Guardar contexto') : null,
-                h('span', null, savingContext === model.id ? ' Guardando…' : ` Activo: ${current.toLocaleString()} tokens`),
+                h('span', null, savingContext === model.id ? ' Guardando…' : ` Entrada activa: ${current.toLocaleString()} tokens`),
               ])
             })) : null,
           ]) : null,

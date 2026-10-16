@@ -213,7 +213,7 @@ declare class ModelContextSettings {
   constructor(path?: string | undefined);
   private read;
   all(): Promise<Record<string, number>>;
-  get(model: string): Promise<number>;
+  get(model: string, defaultContext?: number): Promise<number>;
   set(model: string, contextWindow: number): Promise<void>;
 }
 //#endregion

@@ -8,6 +8,17 @@ El formato se basa en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/
 
 ## [Unreleased]
 
+## [0.32.1] - 2026-10-16
+
+### Añadido
+- **Opciones de contexto anunciadas por el modelo:** `ModelView.contextOptions` publica las ventanas que anuncia cada modelo (base y máximo a partir de `context_length`/`context_window`/`max_context_window` y del catálogo), con etiquetas legibles que suman la salida máxima, igual que en VS Code.
+- **Descubrimiento de contexto:** Nuevo `modelContextOptions()` en `src/core/models/context.ts` que combina descubrimiento y catálogo, calcula los tokens de salida y devuelve `1M (sin metadatos)` cuando el endpoint no publica límites.
+
+### Cambiado
+- **Valor por defecto por modelo:** `listModels` y `resolveModel` usan la mayor opción anunciada por el modelo en lugar de un 1M fijo, y respetan el contexto configurado; `maxOutputTokens` sale del descubrimiento/catálogo en vez de 4096 fijo.
+- **Panel:** El selector por modelo usa las opciones reales que anuncia cada modelo en lugar de presets fijos, y muestra «Entrada activa».
+- **Caché de catálogo:** `resolveModel` carga el catálogo si aún no está disponible y propaga el `AbortSignal` a `fetchCatalog`.
+
 ## [0.32.0] - 2026-10-16
 
 ### Añadido

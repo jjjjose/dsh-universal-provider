@@ -74,7 +74,9 @@ describe('Universal Provider End-to-End Plugin Integration', () => {
     const models = await llm.listModels('universal-chat-provider')
     expect(models.length).toBeGreaterThan(0)
     expect(models.map((model: any) => model.id)).toEqual(['gemini-test', 'gpt-test', 'claude-test'])
-    expect(await ctx.universalProvider.listModels()).toEqual(models.map(model => ({ ...model, contextWindow: 1000000 })))
+    expect(await ctx.universalProvider.listModels()).toEqual(models.map(model => ({
+      ...model, contextWindow: 1000000, contextOptions: [{ value: 1000000, label: '1M (sin metadatos)' }],
+    })))
     expect(updated).toHaveBeenCalledOnce()
     const info = await llm.resolveModelInfo('universal-chat-provider', 'gpt-test')
     expect(info.context?.contextWindow).toBe(1000000)

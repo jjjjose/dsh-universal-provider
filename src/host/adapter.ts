@@ -1,5 +1,6 @@
 import type { ServerSupervisor } from './server.ts'
-import { DEFAULT_MODEL_CONTEXT, ModelContextSettings } from './model-context.ts'
+import { ModelContextSettings } from './model-context.ts'
+import { modelContextOptions } from '../core/models/context.ts'
 import { normalizeUsage } from './usage.ts'
 import type { ProxyRequestBody } from '../core/api/proxy-client.ts'
 import { matchCatalogModel } from '../core/models/catalog-match.ts'
@@ -52,7 +53,7 @@ export class UniversalLlmAdapter extends LlmAdapter {
     const discovery = await client.discover(signal)
     if (!this.catalogs && discovery.available.length) {
       try {
-        this.catalogs = await fetchCatalog()
+        this.catalogs = await fetchCatalog(signal)
       } catch {}
     }
     signal?.throwIfAborted()
@@ -61,6 +62,7 @@ export class UniversalLlmAdapter extends LlmAdapter {
     const models = discovery.available.map((entry) => {
       const metadata = discovery.metadata.find(m => m.slug === entry.id)
       const catalogMatch = this.catalogs ? matchCatalogModel(entry.id, this.catalogs.router) : undefined
+      const { options: contextOptions } = modelContextOptions(entry, metadata, this.catalogs)
 
       const name = metadata?.display_name || catalogMatch?.display_name || entry.id
       const description = metadata?.description || catalogMatch?.description
@@ -72,7 +74,8 @@ export class UniversalLlmAdapter extends LlmAdapter {
       return {
         provider,
         id: entry.id,
-        contextWindow: Object.hasOwn(contexts, entry.id) ? contexts[entry.id]! : DEFAULT_MODEL_CONTEXT,
+        contextWindow: Object.hasOwn(contexts, entry.id) ? contexts[entry.id]! : contextOptions.at(-1)!.value,
+        contextOptions,
         name,
         ...(description !== undefined ? { description } : {}),
         inputModalities: modalities,
@@ -102,8 +105,15 @@ export class UniversalLlmAdapter extends LlmAdapter {
     const entry = discovery.available.find(m => m.id === model)
     if (!entry) throw new LlmError(`El modelo ${model} ya no está disponible. Actualiza el catálogo.`, 'MODEL_UNAVAILABLE')
 
-    const contextWindow = await this.contextSettings.get(model)
-    if (entry.max_completion_tokens) maxOutputTokens = entry.max_completion_tokens
+    if (!this.catalogs) {
+      try {
+        this.catalogs = await fetchCatalog(signal)
+      } catch {}
+    }
+    signal?.throwIfAborted()
+    const { options: contextOptions, outputTokens } = modelContextOptions(entry, metadata, this.catalogs)
+    const contextWindow = await this.contextSettings.get(model, contextOptions.at(-1)!.value)
+    maxOutputTokens = outputTokens
 
     if (metadata?.supported_reasoning_levels?.length) {
       reasoningEfforts = [...new Set(metadata.supported_reasoning_levels.map(l => l.effort).filter(Boolean))].map(effort => ({

@@ -25,9 +25,9 @@ export class ModelContextSettings {
     return this.read()
   }
 
-  async get(model: string): Promise<number> {
+  async get(model: string, defaultContext = DEFAULT_MODEL_CONTEXT): Promise<number> {
     const values = await this.all()
-    return Object.hasOwn(values, model) ? values[model]! : DEFAULT_MODEL_CONTEXT
+    return Object.hasOwn(values, model) ? values[model]! : defaultContext
   }
 
   async set(model: string, contextWindow: number): Promise<void> {

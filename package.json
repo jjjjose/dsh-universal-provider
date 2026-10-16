@@ -1,6 +1,6 @@
 {
   "name": "universal-provider",
-  "version": "0.32.0",
+  "version": "0.32.1",
   "description": "Universal Chat Provider for DeepSeek Harness: OAuth accounts, compatible endpoints, models, streaming, tools, and quotas",
   "type": "module",
   "main": "lib/index.js",

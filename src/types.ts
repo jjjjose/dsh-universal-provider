@@ -3,6 +3,7 @@ export interface ModelView {
   id: string
   name: string
   contextWindow?: number
+  contextOptions?: readonly { value: number; label: string }[]
   description?: string
   inputModalities?: readonly ('text' | 'image')[]
 }
