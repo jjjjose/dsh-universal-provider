@@ -108,9 +108,21 @@ function context(client: any, mount = vi.fn().mockResolvedValue(undefined)) {
 }
 
 describe('DSH client configuration entry', () => {
-  it.each(['antigravity', 'codex'])('opens OAuth immediately and refreshes models after linking %s', async provider => {
+  it.each([
+    ['antigravity', 'popup'],
+    ['codex', 'popup'],
+    ['antigravity', 'external'],
+    ['antigravity', 'closed'],
+    ['antigravity', 'reject-blank'],
+    ['antigravity', 'reject-all'],
+  ])('opens OAuth and refreshes models after linking %s (%s)', async (provider, mode) => {
     const popup = { closed: false, location: { href: '' }, close: vi.fn() }
-    const open = vi.fn().mockReturnValue(popup)
+    const open = vi.fn((url: string) => {
+      if (mode === 'reject-all' || (mode === 'reject-blank' && !url)) throw new Error('Cannot open window')
+      if (mode === 'external' || mode === 'reject-blank') return null
+      if (mode === 'closed') popup.closed = true
+      return popup
+    })
     const wait = vi.fn().mockResolvedValue({ status: 'ok' })
     const { client, renderTree, render } = loadClient(undefined, { open }, wait)
     const { ctx, entries, api, llm } = context(client)
@@ -128,7 +140,16 @@ describe('DSH client configuration entry', () => {
     expect(open).toHaveBeenCalledWith('', '_blank')
     expect(api.startOAuth).toHaveBeenCalledWith(provider, expect.any(AbortSignal))
     await connecting
-    expect(popup.location.href).toBe('https://example.com/oauth')
+    if (mode === 'popup') {
+      expect(popup.location.href).toBe('https://example.com/oauth')
+      expect(open).toHaveBeenCalledOnce()
+    } else {
+      expect(open).toHaveBeenLastCalledWith('https://example.com/oauth', '_blank', 'noopener,noreferrer')
+      const page = JSON.stringify(renderTree(entries[0].component))
+      expect(page).not.toContain('El navegador bloqueó la ventana')
+      if (mode === 'reject-all') expect(page).toContain('No se pudo abrir la autorización automáticamente')
+      else expect(page).not.toContain('No se pudo abrir la autorización automáticamente')
+    }
     expect(wait).toHaveBeenCalledWith(api, 'oauth-state', expect.objectContaining({ signal: expect.any(AbortSignal) }))
     expect(api.listAccounts).toHaveBeenCalledOnce()
     expect(llm.listModels).toHaveBeenCalledWith('universal-chat-provider')

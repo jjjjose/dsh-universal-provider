@@ -162,8 +162,10 @@ function registerSettings(ctx: ClientContext, mountError: string | null = null) 
           setOauthStatus('starting')
           const controller = new AbortController()
           oauthFlow.controller = controller
-          // Open synchronously during the user gesture so the browser does not block the OAuth redirect.
-          const popup = window.open('', '_blank')
+          // Reserve a tab during the user gesture in web browsers. Desktop hosts
+          // may reject blank URLs or open externally without returning a Window.
+          let popup: Window | null = null
+          try { popup = window.open('', '_blank') } catch { /* Try the actual URL below. */ }
           try {
             const res = await expectRemote<{ state: string; url: string }>(remote.startOAuth(provider, controller.signal))
             if (controller.signal.aborted) {
@@ -173,8 +175,14 @@ function registerSettings(ctx: ClientContext, mountError: string | null = null) 
             }
             setOauthSession(res)
             setOauthStatus('wait')
-            if (popup && !popup.closed) popup.location.href = res.url
-            else setError('El navegador bloqueó la ventana. Abre manualmente el enlace de autorización mostrado abajo.')
+            try {
+              if (popup && !popup.closed) popup.location.href = res.url
+              else window.open(res.url, '_blank', 'noopener,noreferrer')
+              // A null return also occurs when DSH delegates to the system browser;
+              // it is not evidence that opening the authorization URL failed.
+            } catch {
+              setError('No se pudo abrir la autorización automáticamente. Abre manualmente el enlace mostrado abajo.')
+            }
 
             const result = await waitForOAuth(remote, res.state, { signal: controller.signal })
             if (!oauthFlow.mounted) return
@@ -416,7 +424,7 @@ function registerSettings(ctx: ClientContext, mountError: string | null = null) 
               oauthStatus === 'wait' ? h('div', { style: { marginTop: '12px', fontSize: '13px', color: 'var(--dsw-alias-text-primary)' } }, [
                 `Esperando confirmación de ${oauthProvider} en el navegador…`,
                 oauthSession?.userCode ? h('div', { style: { marginTop: '6px', fontWeight: 600 } }, `Código de usuario: ${oauthSession.userCode}`) : null,
-                oauthSession?.url ? h('a', { href: oauthSession.url, target: '_blank', rel: 'noopener noreferrer', style: { display: 'inline-block', marginTop: '6px', color: 'var(--dsw-alias-accent)' } }, 'Abrir autorización manualmente') : null,
+                oauthSession?.url ? h('a', { href: oauthSession.url, target: '_blank', rel: 'noopener noreferrer', style: { display: 'inline-block', marginTop: '6px', color: 'var(--dsw-alias-accent)' } }, 'Si no se abrió el navegador, abrir autorización manualmente') : null,
                 h('button', { type: 'button', onClick: () => oauthFlow.controller?.abort(), style: { display: 'block', marginTop: '8px', padding: '5px 10px', border: '1px solid var(--dsw-alias-border)', borderRadius: '6px', background: 'transparent', color: 'var(--dsw-alias-text-primary)', cursor: 'pointer' } }, 'Cancelar'),
               ]) : null,
               oauthStatus === 'ok' ? h('div', { style: { marginTop: '12px', fontSize: '13px', color: 'var(--dsw-alias-text-primary)' } }, [

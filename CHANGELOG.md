@@ -8,6 +8,15 @@ El formato se basa en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/
 
 ## [Unreleased]
 
+## [0.30.4] - 2026-10-15
+
+### Corregido
+- **Apertura de la autorización OAuth:** La reserva de pestaña durante el gesto del usuario se envuelve en `try/catch`, ya que los hosts de escritorio pueden rechazar URLs vacías o abrir el navegador externamente sin devolver una `Window`. Antes, un `window.open('')` fallido abortaba el inicio de sesión.
+- **Vinculación en hosts de escritorio:** Cuando `window.open` no devuelve una ventana (por ejemplo, cuando DSH delega en el navegador del sistema), la URL de autorización se abre igualmente con `noopener,noreferrer` y no se marca como error.
+
+### Mejorado
+- **Mensajes del panel:** El enlace manual y el aviso de fallo ahora usan un texto más claro (`Si no se abrió el navegador, abrir autorización manualmente`) y ya no confunden la delegación al navegador del sistema con un bloqueo del navegador.
+
 ## [0.30.3] - 2026-10-15
 
 ### Corregido
