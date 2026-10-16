@@ -8,6 +8,14 @@ El formato se basa en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/
 
 ## [Unreleased]
 
+## [0.32.2] - 2026-10-16
+
+### Corregido
+- **Contrato Typert de cuotas:** El esquema estricto de `QuotaReportView` ahora declara `models` (cuota por modelo con `remainingPercent`/`resetsAt`), `account` y `error`, además de `balance`/`resetsAt` en `windows`. Antes solo contemplaba `provider` y `windows[].label/remainingPercent`, por lo que las cuotas por modelo de Google (y las cuentas/errores) no pasaban la validación del RPC.
+
+### Añadido
+- **Prueba de empaquetado:** Verifica que el esquema `getQuotas` del paquete, el generado y el del host aceptan y preservan las cuotas por modelo.
+
 ## [0.32.1] - 2026-10-16
 
 ### Añadido

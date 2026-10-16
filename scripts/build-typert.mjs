@@ -79,6 +79,10 @@ export const getEndpointsListSchema = () => (_endpointsListSchema ??= z.array(ge
 let _quotaReportSchema
 export const getQuotaReportSchema = () => (_quotaReportSchema ??= z.object({
   provider: z.string().readonly(),
+  models: z.record(z.string(), z.object({
+    remainingPercent: z.number(),
+    resetsAt: z.number().optional(),
+  })).readonly().optional(),
   windows: z.array(z.object({
     label: z.string().readonly(),
     remainingPercent: z.number().readonly().optional(),
@@ -492,7 +496,7 @@ export const TYPERT = {
           { name: 'OAuthStartResult', declaration: 'export interface OAuthStartResult { readonly url: string; readonly state: string; readonly userCode?: string; }' },
           { name: 'OAuthPollResult', declaration: 'export interface OAuthPollResult { readonly status: "wait" | "ok" | "error"; readonly error?: string; }' },
           { name: 'EndpointView', declaration: 'export interface EndpointView { readonly name: string; readonly baseUrl: string; readonly apiKey?: string; readonly models?: readonly { name: string; alias?: string; }[]; }' },
-          { name: 'QuotaReportView', declaration: 'export interface QuotaReportView { readonly provider: string; readonly windows: readonly { label: string; remainingPercent?: number; }[]; }' },
+          { name: 'QuotaReportView', declaration: 'export interface QuotaReportView { readonly provider: string; readonly windows: readonly { label: string; remainingPercent?: number; balance?: { amount: number; currency: string; suffix: "left" | "used" }; resetsAt?: number }[]; readonly models?: Record<string, { remainingPercent: number; resetsAt?: number }>; readonly account?: { authIndex: string; label: string }; readonly error?: string; }' },
           { name: 'CommitDraftResult', declaration: 'export interface CommitDraftResult { readonly hasStagedChanges: boolean; readonly message?: string; readonly draft?: string; }' },
         ],
       }

@@ -144,6 +144,17 @@ describe('Git installation package', () => {
       }, resetsAt: 123 }], account: { authIndex: '1', label: 'Work' } }]
       const quotaSchema = (value: any) => value.descriptors.find((entry: any) => entry.method === 'getQuotas').result.create()
       expect(quotaSchema(artifact).parse(quota)).toEqual(quotaSchema(generated).parse(quota))
+      const googleQuota = [{
+        provider: 'antigravity', windows: [], account: { authIndex: 'google-1', label: 'Google' },
+        models: {
+          'gemini-pro': { remainingPercent: 0, resetsAt: 4070908800000 },
+          'gemini-flash': { remainingPercent: 75 },
+        },
+      }]
+      for (const descriptors of [artifact.descriptors, generated.descriptors, host.invocations]) {
+        const schema = descriptors.find((entry: any) => entry.method === 'getQuotas').result.create()
+        expect(schema.parse(googleQuota)).toEqual(googleQuota)
+      }
 
       releaseMount()
       // `apply` must settle as a successful activation and must never return the
