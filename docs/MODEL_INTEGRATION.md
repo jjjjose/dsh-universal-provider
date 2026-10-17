@@ -1,6 +1,7 @@
 # Modelos y esfuerzo en DeepSeek Harness
 
-Contrato verificado con `@deepseek-ai/dsh-llm` **0.2.1-alpha.2**.
+Contrato verificado con `@deepseek-ai/dsh-llm` **0.2.1-rc.2**. El suelo
+compatible sigue siendo `0.2.1-alpha.2` (`engines.dsh`, sin techo).
 
 - `UniversalLlmAdapter` extiende el `LlmAdapter` del host; las dependencias
   `@deepseek-ai/*` permanecen externas en el bundle del servidor.

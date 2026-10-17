@@ -1,6 +1,6 @@
 # Universal Chat Provider para DeepSeek Harness
 
-Plugin oficial empaquetado para DeepSeek Harness (DSH v0.2.1-alpha.2 y versiones compatibles), que permite conectar cuentas OAuth (Claude, Codex, Antigravity, Kimi, xAI Grok, Devin, Meta Muse) y endpoints compatibles con OpenAI para utilizarlos de forma transparente en el chat nativo de DeepSeek Harness.
+Plugin oficial empaquetado para DeepSeek Harness (DSH `0.2.1-alpha.2` o posterior, sin techo de versión; verificado con `0.2.1-rc.2`), que permite conectar cuentas OAuth (Claude, Codex, Antigravity, Kimi, xAI Grok, Devin, Meta Muse) y endpoints compatibles con OpenAI para utilizarlos de forma transparente en el chat nativo de DeepSeek Harness.
 
 El resultado es un paquete distribuible precompilado (`.tgz`) que se integra de manera limpia a través de los contratos nativos de Cordis y DSH (`dsh.bundle`, `ctx.llm.registerAdapter`, `dsh-typert-loader` y `plugins.bundle.config`), sin modificar el core de la aplicación ni ejecutar servidores de chat paralelos.
 
@@ -25,7 +25,7 @@ El resultado es un paquete distribuible precompilado (`.tgz`) que se integra de 
 ## 2. Instalación y Desinstalación
 
 ### Requisitos
-- DeepSeek Harness `0.2.1-alpha.2` o posterior.
+- DeepSeek Harness `0.2.1-alpha.2` o posterior (declarado en `engines.dsh`; verificado con `0.2.1-rc.2`).
 - Node.js 22+ y pnpm instalados (o usando las herramientas empaquetadas en `$DSH_HOME/dsh-runtimes/`).
 
 ### Instalación desde GitHub

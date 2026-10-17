@@ -8,6 +8,17 @@ El formato se basa en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/
 
 ## [Unreleased]
 
+## [0.34.0] - 2026-10-17
+
+### Cambiado
+- **Dependencias de desarrollo a DSH `0.2.1-rc.2`:** Se actualizan en bloque `@deepseek-ai/dsh`, `dsh-llm`, `dsh-client-ui-plugin-manager`, `dsh-client-ui-renderer`, `dsh-home-paths`, `dsh-typert-generator`, `dsh-typert-loader` y `dsh-typert-protocol` a `0.2.1-rc.2` (dist-tag `next`), además de `@deepseek-ai/cordis` a `4.0.5` y `@deepseek-ai/schemastery` a `3.18.5` (`~3.18.5` en `dependencies`, la misma serie que usa el arnés).
+- **Suelo de compatibilidad sin cambios:** `engines.dsh` sigue en `>=0.2.1-alpha.2` y el peer `dsh-llm` en `>=0.2.1-alpha.2`, de modo que no se pierde aceptación de versiones anteriores ni de las futuras. El bundle generado es byte-idéntico al de `0.33.0`, por lo que no se adopta ninguna API nueva: la compatibilidad se mantiene, no se restringe.
+
+### Verificado
+- **Preflight real de DSH:** `evaluatePluginCompatibility` de `@deepseek-ai/dsh-app-boot@0.2.1-rc.2` reproduce el error exacto con `0.32.4` y devuelve «compatible» con este manifiesto; acepta `0.2.1-alpha.2`, `beta.1`, `rc.1`, `rc.2`, `0.2.1`, `0.2.2`, `0.3.0-rc.1` y `1.0.0`, y solo rechaza por debajo del suelo.
+- **Suite completa:** 87 pruebas en verde contra `dsh-llm@0.2.1-rc.2` real, incluida `tests/integration.test.ts` con el servicio `LlmRuntime` y contrato Typert. Tipos y build en verde; artefactos `lib/` sin diferencias.
+- **Documentación:** README y `docs/MODEL_INTEGRATION.md` indican el suelo y la versión verificada.
+
 ## [0.33.0] - 2026-10-17
 
 ### Corregido
