@@ -46,3 +46,6 @@ coverage/
 tmp/
 temp/
 .dsh/
+
+# Package tarballs (generated with `npm pack`, attached to GitHub Releases)
+*.tgz
