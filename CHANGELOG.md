@@ -19,6 +19,9 @@ El formato se basa en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/
 - **Suite completa:** 87 pruebas en verde contra `dsh-llm@0.2.1-rc.2` real, incluida `tests/integration.test.ts` con el servicio `LlmRuntime` y contrato Typert. Tipos y build en verde; artefactos `lib/` sin diferencias.
 - **Documentación:** README y `docs/MODEL_INTEGRATION.md` indican el suelo y la versión verificada.
 
+### Eliminado
+- **Tarballs fuera del repositorio:** Se retiran del árbol los siete `.tgz` acumulados (`0.30.0`–`0.34.0`) y se añade `*.tgz` a `.gitignore`. El paquete de cada versión se entrega como adjunto de su GitHub Release en lugar de versionarse.
+
 ## [0.33.0] - 2026-10-17
 
 ### Corregido
