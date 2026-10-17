@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import { runInNewContext } from 'node:vm'
 import { Context, Service } from '@deepseek-ai/cordis'
+import semver from 'semver'
 import { describe, expect, it, vi } from 'vitest'
 
 const root = new URL('../', import.meta.url)
@@ -217,6 +218,41 @@ describe('Git installation package', () => {
     expect(requests).toContain('react')
     expect(clientArtifact).not.toMatch(/require\(["']zod["']\)/)
     expect(clientArtifact).toContain('ZodError')
+  })
+
+  it('declares an open DSH compatibility floor so new harness releases are accepted', () => {
+    // Mirrors DSH's plugin-compatibility preflight: an own `engines.dsh` range
+    // decides alone; otherwise every @deepseek-ai/dsh-* peer is checked with
+    // prereleases included. An exact peer pin is what blocked installations
+    // (e.g. dsh 0.2.1-rc.2 rejected a plugin pinned to dsh-llm 0.2.1-alpha.2).
+    expect(typeof pkg.engines?.dsh).toBe('string')
+    expect(pkg.engines.dsh).toMatch(/^>=/)
+    const exactPeer = Object.entries(pkg.peerDependencies as Record<string, string>)
+      .filter(([name]) => name === '@deepseek-ai/dsh' || name.startsWith('@deepseek-ai/dsh-'))
+      .filter(([, range]) => !range.includes('>=') && !range.includes('^') && !range.includes('~'))
+    expect(exactPeer).toEqual([])
+
+    const satisfies = (version: string, range: string) =>
+      semver.satisfies(version, range, { includePrerelease: true })
+    const compatible = (version: string) => satisfies(version, pkg.engines.dsh)
+
+    // The floor itself and every earlier release stay supported by the range check
+    // only insofar as they satisfy it; what matters is that newer harnesses pass.
+    expect(compatible('0.2.1-alpha.2')).toBe(true)
+    expect(compatible('0.2.1-rc.2')).toBe(true)      // reported rejection
+    expect(compatible('0.2.1')).toBe(true)
+    expect(compatible('0.2.2-alpha.1')).toBe(true)
+    expect(compatible('0.3.0-rc.1')).toBe(true)
+    expect(compatible('1.0.0')).toBe(true)
+    expect(compatible('0.2.1-alpha.1')).toBe(false)   // below the tested floor
+    expect(compatible('0.2.0')).toBe(false)
+
+    // The dsh-llm peer must independently accept the same newer runtimes, since
+    // an engines.dsh floor does not override unmet non-dsh peers.
+    const llmRange = pkg.peerDependencies['@deepseek-ai/dsh-llm']
+    for (const version of ['0.2.1-alpha.2', '0.2.1-rc.2', '0.2.1', '0.2.2', '1.0.0'])
+      expect(satisfies(version, llmRange)).toBe(true)
+    expect(satisfies('0.2.0', llmRange)).toBe(false)
   })
 
   it('keeps the client dependency policy that avoids externals drift', () => {

@@ -8,6 +8,14 @@ El formato se basa en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/
 
 ## [Unreleased]
 
+## [0.33.0] - 2026-10-17
+
+### Corregido
+- **Rechazo por versión del arnés:** El manifiesto declara ahora `engines.dsh: ">=0.2.1-alpha.2"` y el peer `@deepseek-ai/dsh-llm` usa un rango abierto (`>=0.2.1-alpha.2`) en lugar de una versión exacta. El preflight de DSH da prioridad a `engines.dsh` y evalúa con `includePrerelease`, así que el plugin se reconoce compatible con cada entrega nueva del arnés (`0.2.1-rc.2`, `0.2.1`, `0.2.2`, …) sin tener que publicar una versión del plugin por cada lanzamiento. Antes, el peer exacto `0.2.1-alpha.2` bloqueaba la instalación en DSH `0.2.1-rc.2` con «incompatible ... may cause crashes or data loss».
+
+### Añadido
+- **Prueba de compatibilidad del manifiesto:** `tests/packaging.test.ts` replica el preflight oficial de DSH (`engines.dsh` decide solo; los peers `@deepseek-ai/dsh-*` se evalúan con prerelease incluido) y comprueba que ninguna versión nueva del arnés queda bloqueada, que el suelo `0.2.1-alpha.2` sigue declarado y que ningún peer DSH vuelve a quedar fijado a una versión exacta.
+
 ## [0.32.4] - 2026-10-16
 
 ### Añadido

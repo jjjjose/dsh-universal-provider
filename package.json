@@ -1,6 +1,6 @@
 {
   "name": "universal-provider",
-  "version": "0.32.4",
+  "version": "0.33.0",
   "description": "Universal Chat Provider for DeepSeek Harness: OAuth accounts, compatible endpoints, models, streaming, tools, and quotas",
   "type": "module",
   "main": "lib/index.js",
@@ -55,8 +55,11 @@
     "build": "node scripts/clean-build.mjs && node scripts/build-typert.mjs && tsdown",
     "test": "vitest run"
   },
+  "engines": {
+    "dsh": ">=0.2.1-alpha.2"
+  },
   "peerDependencies": {
-    "@deepseek-ai/dsh-llm": "0.2.1-alpha.2",
+    "@deepseek-ai/dsh-llm": ">=0.2.1-alpha.2",
     "@deepseek-ai/cordis": "~4.0.5-alpha.1"
   },
   "dependencies": {
