@@ -222,11 +222,12 @@ interface ModelInfo extends ModelView, LlmModelInfo {}
 declare class UniversalLlmAdapter extends LlmAdapter {
   private readonly supervisor;
   readonly contextSettings: ModelContextSettings;
+  private readonly attachments?;
   private catalogs?;
   private publishedCatalog;
   private pendingModels;
   onModelsChanged: (() => void) | undefined;
-  constructor(supervisor: ServerSupervisor, contextSettings?: ModelContextSettings);
+  constructor(supervisor: ServerSupervisor, contextSettings?: ModelContextSettings, attachments?: Context["attachments"] | undefined);
   setModelContext(model: string, contextWindow: number): Promise<void>;
   providerInfo(provider: string): {
     id: string;
@@ -243,7 +244,7 @@ declare class UniversalLlmAdapter extends LlmAdapter {
     stream: (options: GenerateOptions) => AsyncIterable<any>;
   }>;
   stream(options: any): AsyncIterable<any>;
-  buildRequestBody(options: any): ProxyRequestBody;
+  buildRequestBody(options: any): Promise<ProxyRequestBody>;
 }
 //#endregion
 //#region src/index.d.ts

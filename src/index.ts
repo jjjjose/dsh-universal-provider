@@ -289,7 +289,7 @@ export function apply(ctx: Context, config: ProviderConfig) {
   const paths = resolveProviderPaths(profileId)
   const supervisor = new ServerSupervisor(ctx, paths, config)
 
-  const adapter = new UniversalLlmAdapter(supervisor, new ModelContextSettings(join(paths.profileRoot, 'model-contexts.json')))
+  const adapter = new UniversalLlmAdapter(supervisor, new ModelContextSettings(join(paths.profileRoot, 'model-contexts.json')), ctx.get('attachments'))
   new UniversalProviderService(ctx, supervisor, paths, config, adapter)
 
   const llm: LlmRuntime = ctx.llm

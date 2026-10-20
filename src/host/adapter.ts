@@ -1,3 +1,4 @@
+import type { Context } from '@deepseek-ai/cordis'
 import type { ServerSupervisor } from './server.ts'
 import { ModelContextSettings } from './model-context.ts'
 import { modelContextOptions } from '../core/models/context.ts'
@@ -17,7 +18,7 @@ export class UniversalLlmAdapter extends LlmAdapter {
   private pendingModels = new Map<string, Promise<readonly ModelInfo[]>>()
   onModelsChanged: (() => void) | undefined
 
-  constructor(private readonly supervisor: ServerSupervisor, readonly contextSettings = new ModelContextSettings()) { super() }
+  constructor(private readonly supervisor: ServerSupervisor, readonly contextSettings = new ModelContextSettings(), private readonly attachments?: Context['attachments']) { super() }
 
   async setModelContext(model: string, contextWindow: number): Promise<void> {
     await this.contextSettings.set(model, contextWindow)
@@ -141,7 +142,8 @@ export class UniversalLlmAdapter extends LlmAdapter {
       }
     }
 
-    if (metadata?.input_modalities?.includes('image')) modalities.push('image')
+    const catalogMatch = this.catalogs ? matchCatalogModel(model, this.catalogs.router) : undefined
+    if (metadata?.input_modalities?.includes('image') || catalogMatch?.supportedInputModalities?.includes('image')) modalities.push('image')
     signal?.throwIfAborted()
 
     return {
@@ -175,7 +177,8 @@ export class UniversalLlmAdapter extends LlmAdapter {
       const client = this.supervisor.getProxyClient()
       if (!client) throw new LlmError('CLIProxyAPI client unavailable', 'PROVIDER_UNAVAILABLE')
 
-      const body = this.buildRequestBody(options)
+      const body = await this.buildRequestBody(options)
+      options.signal?.throwIfAborted()
 
       let nextIndex = 0
       let textIndex: number | undefined
@@ -315,10 +318,11 @@ export class UniversalLlmAdapter extends LlmAdapter {
     }
   }
 
-  buildRequestBody(options: any): ProxyRequestBody {
+  async buildRequestBody(options: any): Promise<ProxyRequestBody> {
     const input: Record<string, unknown>[] = []
 
     for (const msg of options.messages ?? []) {
+      options.signal?.throwIfAborted()
       const role = msg.role
       if (role === 'system' || role === 'developer') {
         const text = typeof msg.content === 'string'
@@ -335,11 +339,22 @@ export class UniversalLlmAdapter extends LlmAdapter {
           for (const block of msg.content) {
             if (block.type === 'text') {
               contents.push({ type: 'input_text', text: block.text })
-            } else if (block.type === 'image' && block.attachment) {
-              const mime = block.attachment.mediaType || 'image/png'
+            } else if (block.type === 'image') {
+              if (!block.attachment) throw new Error('La imagen no tiene una referencia de adjunto válida.')
+              if (!this.attachments) throw new Error('El servicio de imágenes no está disponible.')
+              const image = await this.attachments.readImageRequest(
+                block.attachment,
+                this.imageRequestTarget(options.provider, options.model, block.attachment),
+                options.signal,
+              )
+              options.signal?.throwIfAborted()
+              if (!image.data.byteLength) throw new Error('La imagen no contiene datos.')
+              if (!['image/png', 'image/jpeg', 'image/webp', 'image/gif'].includes(image.mediaType)) {
+                throw new Error('El servicio de imágenes devolvió un formato no compatible.')
+              }
               contents.push({
                 type: 'input_image',
-                image_url: `data:${mime};base64,${block.attachment.base64 || ''}`,
+                image_url: `data:${image.mediaType};base64,${Buffer.from(image.data).toString('base64')}`,
               })
             }
           }

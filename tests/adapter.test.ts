@@ -4,6 +4,9 @@ import { AssistantStreamAccumulator } from '@deepseek-ai/dsh-llm'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { createRequire } from 'node:module'
+import { pathToFileURL } from 'node:url'
+import { Context } from '@deepseek-ai/cordis'
 import { ModelContextSettings } from '../src/host/model-context.ts'
 
 vi.mock('../src/core/models/catalog.ts', () => ({ fetchCatalog: vi.fn(async () => { throw new Error('offline') }) }))
@@ -76,9 +79,9 @@ describe('UniversalLlmAdapter', () => {
     }),
   } as any
 
-  it('translates DSH GenerateOptions to /v1/responses format', () => {
+  it('translates DSH GenerateOptions to /v1/responses format', async () => {
     const adapter = new UniversalLlmAdapter(mockSupervisor)
-    const body = adapter.buildRequestBody({
+    const body = await adapter.buildRequestBody({
       model: 'claude-3-7-sonnet',
       reasoningEffort: 'high',
       messages: [
@@ -108,6 +111,115 @@ describe('UniversalLlmAdapter', () => {
     expect(body.input[3]?.role).toBe('assistant')
     expect(body.input[4]?.type).toBe('function_call_output')
     expect(body.input[4]?.call_id).toBe('call-1')
+  })
+
+  it('loads durable image references before sending the request without mutating history', async () => {
+    const data = Buffer.from('image bytes')
+    const attachment = { attachmentId: 'stored-image', mediaType: 'image/png', bytes: data.length, width: 32, height: 16 }
+    const readImageRequest = vi.fn().mockResolvedValue({
+      variantId: 'request-version', attachment, data, mediaType: 'image/webp',
+      bytes: data.length, width: 32, height: 16, depth: 'uchar', space: 'srgb', hasAlpha: false,
+    })
+    const streamResponse = vi.fn(async () => {})
+    const adapter = new UniversalLlmAdapter({
+      ...mockSupervisor,
+      getProxyClient: () => ({ streamResponse }),
+    } as any, undefined, { readImageRequest } as any)
+    const signal = new AbortController().signal
+    const messages = [{ role: 'user', content: [
+      { type: 'text', text: 'Describe this image' },
+      { type: 'image', attachment },
+    ] }]
+    for await (const _ of adapter.stream({ provider: 'provider', model: 'vision', messages, signal })) {}
+    expect(readImageRequest).toHaveBeenCalledWith(attachment, adapter.imageRequestTarget('provider', 'vision', attachment as any), signal)
+    expect(streamResponse.mock.calls[0]?.[0]).toMatchObject({ input: [{ role: 'user', content: [
+      { type: 'input_text', text: 'Describe this image' },
+      { type: 'input_image', image_url: `data:image/webp;base64,${data.toString('base64')}` },
+    ] }] })
+    expect(attachment).not.toHaveProperty('base64')
+  })
+
+  it('rejects empty image data instead of sending an empty data URL', async () => {
+    const streamResponse = vi.fn(async () => {})
+    const release = vi.fn()
+    const adapter = new UniversalLlmAdapter({
+      ...mockSupervisor,
+      acquireRequest: async () => release,
+      getProxyClient: () => ({ streamResponse }),
+    } as any, undefined, { readImageRequest: async () => ({ data: new Uint8Array(), mediaType: 'image/png' }) } as any)
+    const options = { provider: 'provider', model: 'vision', messages: [{ role: 'user', content: [
+      { type: 'image', attachment: { mediaType: 'image/png', width: 1, height: 1 } },
+    ] }] }
+    await expect(async () => { for await (const _ of adapter.stream(options)) {} }).rejects.toThrow('no contiene datos')
+    expect(streamResponse).not.toHaveBeenCalled()
+    expect(release).toHaveBeenCalledOnce()
+    await expect(adapter.buildRequestBody(options)).rejects.toThrow('no contiene datos')
+  })
+
+  it.each(['missing', 'read-error', 'cancelled', 'invalid-mime'])('does not dispatch images when %s', async (failure) => {
+    const controller = new AbortController()
+    const release = vi.fn()
+    const streamResponse = vi.fn(async () => {})
+    const readImageRequest = vi.fn(async () => {
+      if (failure === 'read-error') throw new Error('attachment unavailable')
+      if (failure === 'cancelled') controller.abort(new Error('cancelled'))
+      return { data: new Uint8Array([1]), mediaType: 'application/pdf' }
+    })
+    const adapter = new UniversalLlmAdapter({
+      ...mockSupervisor, acquireRequest: async () => release,
+      getProxyClient: () => ({ streamResponse }),
+    } as any, undefined, failure === 'missing' ? undefined : { readImageRequest } as any)
+    await expect(async () => {
+      for await (const _ of adapter.stream({
+        provider: 'provider', model: 'vision', signal: controller.signal,
+        messages: [{ role: 'user', content: [{ type: 'image', attachment: {
+          attachmentId: 'stored', mediaType: 'image/png', bytes: 1, width: 1, height: 1,
+        } }] }],
+      })) {}
+    }).rejects.toThrow()
+    expect(streamResponse).not.toHaveBeenCalled()
+    expect(release).toHaveBeenCalledOnce()
+  })
+
+  it('serializes an image saved and prepared by the real Harness attachment store', async () => {
+    const require = createRequire(import.meta.url)
+    const dshRequire = createRequire(require.resolve('@deepseek-ai/dsh/package.json'))
+    const { LocalAttachmentStore } = await import(pathToFileURL(dshRequire.resolve('@deepseek-ai/dsh-attachment-local')).href)
+    const home = await mkdtemp(join(tmpdir(), 'harness-images-'))
+    const ctx = new Context()
+    try {
+      const store = new LocalAttachmentStore(ctx, { dshHome: home })
+      const data = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAIAAAD91JpzAAAAEElEQVR4nGP8zwACTGCSAQANHQEDgslx/wAAAABJRU5ErkJggg==', 'base64')
+      const attachment = await store.saveImage({ data, mediaType: 'image/png' })
+      const adapter = new UniversalLlmAdapter(mockSupervisor, undefined, store)
+      const expected = await store.readImageRequest(attachment, adapter.imageRequestTarget('provider', 'vision', attachment))
+      const body = await adapter.buildRequestBody({ provider: 'provider', model: 'vision', messages: [
+        { role: 'user', content: [{ type: 'image', attachment }] },
+      ] })
+      const image = (body.input[0]!.content as any[])[0]
+      expect(image.type).toBe('input_image')
+      expect(image.image_url).toBe(`data:${expected.mediaType};base64,${Buffer.from(expected.data).toString('base64')}`)
+    } finally {
+      await ctx.fiber.dispose()
+      await rm(home, { recursive: true, force: true })
+    }
+  })
+
+  it('preserves text and multiple image order and exact request bytes', async () => {
+    const data = new Uint8Array([0, 128, 255])
+    const attachment = Object.freeze({ attachmentId: 'stored', mediaType: 'image/png', bytes: 3, width: 1, height: 1 })
+    const adapter = new UniversalLlmAdapter(mockSupervisor, undefined, {
+      readImageRequest: async () => ({ data, mediaType: 'image/jpeg' }),
+    } as any)
+    const content = Object.freeze([
+      Object.freeze({ type: 'text', text: 'first' }), Object.freeze({ type: 'image', attachment }),
+      Object.freeze({ type: 'text', text: 'second' }), Object.freeze({ type: 'image', attachment }),
+    ])
+    const body = await adapter.buildRequestBody({ provider: 'provider', model: 'vision', messages: [{ role: 'user', content }] })
+    const sent = body.input[0]!.content as any[]
+    expect(sent.map(block => block.type)).toEqual(['input_text', 'input_image', 'input_text', 'input_image'])
+    expect(Buffer.from(sent[1].image_url.split(',')[1], 'base64')).toEqual(Buffer.from(data))
+    expect(sent[1].image_url).toMatch(/^data:image\/jpeg;base64,/)
   })
 
   it('streams chunks with balanced blocks, reasoning, tools, and usage', async () => {
