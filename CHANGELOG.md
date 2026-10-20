@@ -8,6 +8,17 @@ El formato se basa en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/
 
 ## [Unreleased]
 
+## [0.34.1] - 2026-10-19
+
+### Corregido
+- **Imágenes con adjuntos nativos de Harness:** Se recuperan los bytes mediante `readImageRequest` y se respeta `imageRequestTarget`, enviando el MIME y los datos de la versión preparada por Harness como `input_image` de Responses. Se evita el base64 vacío sin modificar las referencias del historial.
+- **Errores y cancelación:** Los adjuntos vacíos, inaccesibles o con formato inválido fallan antes del envío a CLIProxyAPI; se propaga la cancelación y se libera la reserva de solicitud. Las conversaciones de texto siguen funcionando sin servicio de adjuntos.
+- **Modalidades consistentes:** La resolución del modelo también reconoce las capacidades de visión indicadas por el catálogo.
+
+### Verificado
+- **Compatibilidad nativa:** Prueba de guardado y preparación con el almacenamiento real de adjuntos de Harness, además de orden de imágenes/texto, integridad de bytes y ausencia de mutaciones del historial.
+- **Validación:** 95 pruebas correctas, comprobación TypeScript y compilación; 9 pruebas de empaquetado repetidas sobre los artefactos finales. Envío real desde la GUI pendiente de comprobación.
+
 ## [0.34.0] - 2026-10-17
 
 ### Cambiado
